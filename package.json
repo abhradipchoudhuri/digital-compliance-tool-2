@@ -1,0 +1,56 @@
+{
+  "name": "digital-compliance-tool-2",
+  "version": "1.0.0",
+  "description": "> A modern Electron desktop application for generating compliant legal copy for digital marketing assets, replacing the legacy Google Sites implementation with a professional, offline-capable solution.",
+  "main": ".eslintrc.js",
+  "directories": {
+    "doc": "docs",
+    "test": "tests"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/abhradipchoudhuri/digital-compliance-tool-2.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/abhradipchoudhuri/digital-compliance-tool-2/issues"
+  },
+  "homepage": "https://github.com/abhradipchoudhuri/digital-compliance-tool-2#readme",
+  "devDependencies": {
+    "@babel/core": "^7.28.3",
+    "@babel/preset-react": "^7.27.1",
+    "@electron-forge/cli": "^7.8.3",
+    "babel-loader": "^10.0.0",
+    "concurrently": "^9.2.1",
+    "copy-webpack-plugin": "^13.0.1",
+    "cross-env": "^10.0.0",
+    "css-loader": "^7.1.2",
+    "electron": "^37.3.1",
+    "electron-builder": "^26.0.12",
+    "electron-forge": "^0.0.2",
+    "electron-updater": "^6.6.2",
+    "eslint": "^9.34.0",
+    "eslint-plugin-react": "^7.37.5",
+    "html-webpack-plugin": "^5.6.4",
+    "prettier": "^3.6.2",
+    "style-loader": "^4.0.0",
+    "wait-on": "^8.0.4",
+    "webpack": "^5.101.3",
+    "webpack-cli": "^6.0.1",
+    "webpack-dev-server": "^5.2.2"
+  },
+  "dependencies": {
+    "@headlessui/react": "^2.2.7",
+    "lucide-react": "^0.542.0",
+    "papaparse": "^5.5.3",
+    "react": "^19.1.1",
+    "react-dom": "^19.1.1",
+    "tailwindcss": "^4.1.12",
+    "xlsx": "^0.18.5"
+  }
+}

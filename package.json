@@ -2,13 +2,21 @@
   "name": "digital-compliance-tool-2",
   "version": "1.0.0",
   "description": "> A modern Electron desktop application for generating compliant legal copy for digital marketing assets, replacing the legacy Google Sites implementation with a professional, offline-capable solution.",
-  "main": ".eslintrc.js",
+  "main": "src/main/main.js",
+  "homepage": ".",
   "directories": {
     "doc": "docs",
     "test": "tests"
   },
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start": "concurrently \"npm run webpack-dev\" \"wait-on http://localhost:3000 && electron .\"",
+    "webpack-dev": "webpack serve --mode development",
+    "webpack-prod": "webpack --mode production",
+    "electron": "electron .",
+    "build": "npm run webpack-prod && electron-builder",
+    "dist": "npm run build",
+    "pack": "electron-builder --dir",
+    "postinstall": "electron-builder install-app-deps"
   },
   "repository": {
     "type": "git",
@@ -32,7 +40,6 @@
     "css-loader": "^7.1.2",
     "electron": "^37.3.1",
     "electron-builder": "^26.0.12",
-    "electron-forge": "^0.0.2",
     "electron-updater": "^6.6.2",
     "eslint": "^9.34.0",
     "eslint-plugin-react": "^7.37.5",

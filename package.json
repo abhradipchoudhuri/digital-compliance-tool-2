@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "description": "> A modern Electron desktop application for generating compliant legal copy for digital marketing assets, replacing the legacy Google Sites implementation with a professional, offline-capable solution.",
   "main": "src/main/main.js",
-  "homepage": ".",
+  "homepage": "https://github.com/abhradipchoudhuri/digital-compliance-tool-2#readme",
   "directories": {
     "doc": "docs",
     "test": "tests"
@@ -28,7 +28,6 @@
   "bugs": {
     "url": "https://github.com/abhradipchoudhuri/digital-compliance-tool-2/issues"
   },
-  "homepage": "https://github.com/abhradipchoudhuri/digital-compliance-tool-2#readme",
   "devDependencies": {
     "@babel/core": "^7.28.3",
     "@babel/preset-react": "^7.27.1",
@@ -41,23 +40,23 @@
     "electron": "^37.3.1",
     "electron-builder": "^26.0.12",
     "electron-updater": "^6.6.2",
-    "eslint": "^9.34.0",
+    "eslint": "^9.35.0",
     "eslint-plugin-react": "^7.37.5",
     "html-webpack-plugin": "^5.6.4",
     "prettier": "^3.6.2",
     "style-loader": "^4.0.0",
-    "wait-on": "^8.0.4",
+    "wait-on": "^8.0.5",
     "webpack": "^5.101.3",
     "webpack-cli": "^6.0.1",
     "webpack-dev-server": "^5.2.2"
   },
   "dependencies": {
     "@headlessui/react": "^2.2.7",
+    "exceljs": "^4.4.0",
     "lucide-react": "^0.542.0",
     "papaparse": "^5.5.3",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
-    "tailwindcss": "^4.1.12",
-    "xlsx": "^0.18.5"
+    "tailwindcss": "^4.1.12"
   }
 }

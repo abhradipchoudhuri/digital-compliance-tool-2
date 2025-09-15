@@ -1,13 +1,16 @@
 @"
-/** @type {import('tailwindcss').Config} */
 module.exports = {
   content: [
-    "./src/**/*.{js,jsx,ts,tsx}",
     "./src/renderer/**/*.{js,jsx,ts,tsx}",
   ],
   theme: {
-    extend: {},
+    extend: {
+      colors: {
+        'bf-blue': '#1f4788',
+        'bf-gold': '#d4af37',
+      },
+    },
   },
   plugins: [],
 }
-"@ | Out-File -FilePath "tailwind.config.js" -Encoding UTF8
+"@ | Out-File -FilePath "tailwind.config.js" -Encoding UTF8 -Force

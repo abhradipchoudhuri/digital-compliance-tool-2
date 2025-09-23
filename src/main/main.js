@@ -218,11 +218,11 @@ function setupIPC() {
 function getExcelFilePath() {
   if (isDev) {
     // Development: use file from project data directory
-    return path.join(__dirname, '../../data/templates/trademark-data.xlsx');
+    return path.join(__dirname, '../../data/templates/EXTERNAL - Trademark Tool Data (1).xlsx');
   } else {
     // Production: use file from resources
     const resourcePath = process.resourcesPath || path.join(process.cwd(), 'resources');
-    return path.join(resourcePath, 'data/templates/trademark-data.xlsx');
+    return path.join(resourcePath, 'data/templates/EXTERNAL - Trademark Tool Data (1).xlsx');
   }
 }
 

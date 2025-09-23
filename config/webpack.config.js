@@ -32,7 +32,16 @@ module.exports = {
         use: {
           loader: 'babel-loader',
           options: {
-            presets: ['@babel/preset-react'],
+            presets: [
+              ['@babel/preset-env', {
+                targets: {
+                  electron: '37.3.1'
+                }
+              }],
+              ['@babel/preset-react', {
+                runtime: 'automatic'
+              }]
+            ],
           },
         },
       },

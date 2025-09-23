@@ -404,4 +404,4 @@ if (process.env.NODE_ENV === 'development') {
 }
 
 // Export the Excel data context for use in other components
-export { ExcelDataContext, useExcelData };
+export { ExcelDataContext };

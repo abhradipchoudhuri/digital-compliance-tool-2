@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, dialog } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, Menu } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const { autoUpdater } = require('electron-updater');
@@ -17,6 +17,49 @@ if (isDev) {
       hardResetMethod: 'exit'
     });
   } catch (_) {}
+}
+
+function createMenu() {
+  const template = [
+    {
+      label: 'Help',
+      submenu: [
+        {
+          label: 'About Digital Compliance Tool',
+          click: () => {
+            dialog.showMessageBox(mainWindow, {
+              type: 'info',
+              title: 'About',
+              message: 'Digital Compliance Tool',
+              detail: `Version: ${app.getVersion()}\nElectron: ${process.versions.electron}\nA modern desktop application for generating compliant legal copy.`
+            });
+          }
+        }
+      ]
+    }
+  ];
+
+  // Add Quit option differently based on platform
+  if (isMac) {
+    template.unshift({
+      label: app.getName(),
+      submenu: [
+        { role: 'about' },
+        { type: 'separator' },
+        { role: 'quit' }
+      ]
+    });
+  } else {
+    template.unshift({
+      label: 'File',
+      submenu: [
+        { role: 'quit' }
+      ]
+    });
+  }
+
+  const menu = Menu.buildFromTemplate(template);
+  Menu.setApplicationMenu(menu);
 }
 
 function createWindow() {
@@ -185,6 +228,7 @@ function getExcelFilePath() {
 
 // App event handlers
 app.whenReady().then(() => {
+  createMenu(); // Set up the custom menu first
   createWindow();
 
   app.on('activate', () => {

@@ -1,5 +1,6 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
+import PropTypes from 'prop-types';
 import './styles/globals.css';
 import App from './App';
 
@@ -95,6 +96,19 @@ class AppWrapper extends React.Component {
     await this.initializeApp();
   };
 
+  getDiagnosticInfo = () => {
+    return {
+      electronAPI: !!window.electronAPI,
+      nodeEnv: process.env.NODE_ENV,
+      timestamp: new Date().toISOString(),
+      userAgent: navigator.userAgent,
+      memoryUsage: performance.memory ? {
+        used: Math.round(performance.memory.usedJSHeapSize / 1048576) + ' MB',
+        total: Math.round(performance.memory.totalJSHeapSize / 1048576) + ' MB'
+      } : 'Not available'
+    };
+  };
+
   render() {
     const { isLoading, error, excelData, appReady } = this.state;
 
@@ -117,6 +131,8 @@ class AppWrapper extends React.Component {
 
     // Error screen
     if (error && !appReady) {
+      const diagnosticInfo = this.getDiagnosticInfo();
+      
       return (
         <div className="min-h-screen bg-bf-blue flex items-center justify-center p-8">
           <div className="max-w-md text-center">
@@ -140,7 +156,7 @@ class AppWrapper extends React.Component {
             
             <button 
               onClick={this.handleRetry}
-              className="bg-bf-gold text-bf-blue px-6 py-2 rounded-lg font-semibold hover:bg-yellow-400 transition-colors"
+              className="bg-bf-gold text-bf-blue px-6 py-2 rounded-lg font-semibold hover:bg-yellow-400 transition-colors mb-4"
             >
               Retry Loading
             </button>
@@ -150,6 +166,15 @@ class AppWrapper extends React.Component {
               <p>1. Check that the Excel file exists in data/templates/</p>
               <p>2. Verify the Excel file contains all required sheets</p>
               <p>3. Restart the application</p>
+              
+              {process.env.NODE_ENV === 'development' && (
+                <details className="mt-4 text-left">
+                  <summary className="cursor-pointer">Show Diagnostic Info</summary>
+                  <pre className="mt-2 text-xs bg-gray-800 text-white p-2 rounded overflow-auto max-h-32">
+                    {JSON.stringify(diagnosticInfo, null, 2)}
+                  </pre>
+                </details>
+              )}
             </div>
           </div>
         </div>
@@ -169,7 +194,7 @@ class AppWrapper extends React.Component {
   }
 }
 
-// Excel data context provider
+// Excel data context provider with PropTypes
 const ExcelDataContext = React.createContext();
 
 export const useExcelData = () => {
@@ -226,6 +251,13 @@ const ExcelDataProvider = ({ children, data }) => {
     }));
   };
 
+  // Method to refresh data (for future use)
+  const refreshData = async () => {
+    // Future enhancement: Logic to refresh Excel data if needed
+    logger.info('Data refresh requested - feature not yet implemented');
+    return { success: false, message: 'Data refresh not yet implemented' };
+  };
+
   const contextValue = {
     // Raw data
     rawData: excelData,
@@ -244,12 +276,16 @@ const ExcelDataProvider = ({ children, data }) => {
     getAssetTypes,
     getCountries,
     
+    // Utility methods
+    refreshData,
+    
     // Data statistics
     stats: {
       totalSheets: Object.keys(excelData).length,
       totalBrands: getBrands().length,
       totalAssetTypes: getAssetTypes().length,
-      totalCountries: getCountries().length
+      totalCountries: getCountries().length,
+      lastUpdated: new Date().toISOString()
     }
   };
 
@@ -260,14 +296,32 @@ const ExcelDataProvider = ({ children, data }) => {
   );
 };
 
+// PropTypes for ExcelDataProvider
+ExcelDataProvider.propTypes = {
+  children: PropTypes.node.isRequired,
+  data: PropTypes.shape({
+    'Trademark Config': PropTypes.array,
+    'CountryLanguage': PropTypes.array,
+    'Trademark Language': PropTypes.array,
+    'Trademark Structure': PropTypes.array,
+    'Language Dependent Variables': PropTypes.array,
+    'Overall Structure': PropTypes.array,
+    'Help Text': PropTypes.array
+  }).isRequired
+};
+
 // Create root and render app
 const root = ReactDOM.createRoot(document.getElementById('root'));
 
-// Error boundary for the entire app
+// Enhanced Error boundary for the entire app
 class ErrorBoundary extends React.Component {
   constructor(props) {
     super(props);
-    this.state = { hasError: false, error: null };
+    this.state = { 
+      hasError: false, 
+      error: null,
+      errorInfo: null 
+    };
   }
 
   static getDerivedStateFromError(error) {
@@ -276,6 +330,10 @@ class ErrorBoundary extends React.Component {
 
   componentDidCatch(error, errorInfo) {
     logger.error('React Error Boundary caught an error:', error, errorInfo);
+    this.setState({
+      error: error.message,
+      errorInfo: errorInfo.componentStack
+    });
   }
 
   render() {
@@ -286,6 +344,16 @@ class ErrorBoundary extends React.Component {
             <h1 className="text-2xl font-bold mb-4">Something went wrong</h1>
             <p className="mb-4">The application encountered an unexpected error.</p>
             <p className="text-sm opacity-80 mb-6">{this.state.error}</p>
+            
+            {process.env.NODE_ENV === 'development' && this.state.errorInfo && (
+              <details className="mb-6 text-left">
+                <summary className="cursor-pointer text-center">Show Error Details</summary>
+                <pre className="mt-2 text-xs bg-gray-800 text-white p-2 rounded overflow-auto max-h-32">
+                  {this.state.errorInfo}
+                </pre>
+              </details>
+            )}
+            
             <button 
               onClick={() => window.location.reload()}
               className="bg-bf-gold text-bf-blue px-6 py-2 rounded-lg font-semibold hover:bg-yellow-400 transition-colors"
@@ -311,13 +379,28 @@ root.render(
 // Log app startup
 logger.info('Digital Compliance Tool renderer started');
 
-// Performance monitoring
+// Enhanced performance monitoring
 if (process.env.NODE_ENV === 'development') {
+  // Memory usage monitoring
   if ('measureUserAgentSpecificMemory' in performance) {
     performance.measureUserAgentSpecificMemory().then(result => {
       logger.info('Memory usage:', result);
     });
   }
+  
+  // Basic performance metrics
+  if (performance.memory) {
+    logger.info('Performance memory:', {
+      used: Math.round(performance.memory.usedJSHeapSize / 1048576) + ' MB',
+      total: Math.round(performance.memory.totalJSHeapSize / 1048576) + ' MB',
+      limit: Math.round(performance.memory.jsHeapSizeLimit / 1048576) + ' MB'
+    });
+  }
+
+  // Log initialization timing
+  window.addEventListener('load', () => {
+    logger.info('Window loaded at:', performance.now() + 'ms');
+  });
 }
 
 // Export the Excel data context for use in other components

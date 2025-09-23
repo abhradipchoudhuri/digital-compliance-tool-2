@@ -10,7 +10,7 @@
   },
   "scripts": {
     "start": "concurrently \"npm run webpack-dev\" \"wait-on http://localhost:3000 && electron .\"",
-    "webpack-dev": "webpack serve --config config/webpack.config.js --mode development"
+    "webpack-dev": "webpack serve --config config/webpack.config.js --mode development",
     "webpack-prod": "webpack --mode production",
     "electron": "electron .",
     "build": "npm run webpack-prod && electron-builder",

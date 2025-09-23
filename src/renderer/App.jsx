@@ -1,4 +1,3 @@
-# Create a proper App.jsx with Tailwind classes
 echo 'import React from "react";
 
 function App() {

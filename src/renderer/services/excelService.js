@@ -1,195 +1,550 @@
 // src/renderer/services/excelService.js
-// Enhanced Excel Service matching the actual Brown-Forman Digital Compliance Tool
+// Enhanced Excel Service with real Brown-Forman brand data
 
 export class ExcelService {
   constructor() {
     this.isLoaded = false;
     this.data = null;
-    this.cache = new Map();
+    this.brandData = this.initializeBrandData();
+    this.countryData = this.initializeCountryData();
+    this.assetTypeData = this.initializeAssetTypeData();
+  }
+
+  initializeBrandData() {
+    // Real Brown-Forman brands from the screenshot and company portfolio
+    return [
+      // Tequila Brands
+      { 
+        id: 'amigos-herradura', 
+        name: 'Amigos de Herradura', 
+        displayName: 'Amigos de Herradura',
+        category: 'Tequila', 
+        entityName: 'Brown-Forman Tequila Mexico',
+        type: 'Brand',
+        active: true,
+        keywords: ['amigos', 'herradura', 'tequila']
+      },
+      { 
+        id: 'herradura-tequila', 
+        name: 'Herradura Tequila', 
+        displayName: 'Herradura Tequila',
+        category: 'Tequila', 
+        entityName: 'Brown-Forman Tequila Mexico',
+        type: 'Brand',
+        active: true,
+        keywords: ['herradura', 'tequila']
+      },
+      { 
+        id: 'el-jimador-new', 
+        name: 'el Jimador New Mix', 
+        displayName: 'el Jimador New Mix',
+        category: 'Tequila', 
+        entityName: 'Brown-Forman Tequila Mexico',
+        type: 'Brand',
+        active: true,
+        keywords: ['jimador', 'tequila', 'new', 'mix']
+      },
+
+      // Rum Brands
+      { 
+        id: 'botucal', 
+        name: 'Botucal', 
+        displayName: 'Botucal',
+        category: 'Rum', 
+        entityName: 'Brown-Forman Rum',
+        type: 'Brand',
+        active: true,
+        keywords: ['botucal', 'rum']
+      },
+      { 
+        id: 'diplomatico', 
+        name: 'Diplomático', 
+        displayName: 'Diplomático',
+        category: 'Rum', 
+        entityName: 'Brown-Forman Rum',
+        type: 'Brand',
+        active: true,
+        keywords: ['diplomatico', 'rum']
+      },
+
+      // Jack Daniel's Family
+      { 
+        id: 'jack-daniels-old-7', 
+        name: "Jack Daniel's Old No 7", 
+        displayName: "Jack Daniel's Old No 7",
+        category: 'Tennessee Whiskey', 
+        entityName: 'Jack Daniel Distillery',
+        type: 'Brand',
+        active: true,
+        keywords: ['jack', 'daniels', 'old', 'no', '7', 'whiskey']
+      },
+      { 
+        id: 'jack-daniels-sinatra', 
+        name: "Jack Daniel's Sinatra Select", 
+        displayName: "Jack Daniel's Sinatra Select",
+        category: 'Tennessee Whiskey', 
+        entityName: 'Jack Daniel Distillery',
+        type: 'Brand',
+        active: true,
+        keywords: ['jack', 'daniels', 'sinatra', 'select', 'whiskey']
+      },
+      { 
+        id: 'jack-daniels-single-barrel', 
+        name: "Jack Daniel's Single Barrel Series", 
+        displayName: "Jack Daniel's Single Barrel Series",
+        category: 'Tennessee Whiskey', 
+        entityName: 'Jack Daniel Distillery',
+        type: 'Brand',
+        active: true,
+        keywords: ['jack', 'daniels', 'single', 'barrel', 'whiskey']
+      },
+      { 
+        id: 'jack-daniels-bonded', 
+        name: "Jack Daniel's Bonded Series", 
+        displayName: "Jack Daniel's Bonded Series",
+        category: 'Tennessee Whiskey', 
+        entityName: 'Jack Daniel Distillery',
+        type: 'Brand',
+        active: true,
+        keywords: ['jack', 'daniels', 'bonded', 'whiskey']
+      },
+      { 
+        id: 'jack-daniels-bottled', 
+        name: "Jack Daniel's Bottled in Bond", 
+        displayName: "Jack Daniel's Bottled in Bond",
+        category: 'Tennessee Whiskey', 
+        entityName: 'Jack Daniel Distillery',
+        type: 'Brand',
+        active: true,
+        keywords: ['jack', 'daniels', 'bottled', 'bond', 'whiskey']
+      },
+      { 
+        id: 'jack-daniels-27', 
+        name: "Jack Daniel's No. 27 Gold", 
+        displayName: "Jack Daniel's No. 27 Gold",
+        category: 'Tennessee Whiskey', 
+        entityName: 'Jack Daniel Distillery',
+        type: 'Brand',
+        active: true,
+        keywords: ['jack', 'daniels', '27', 'gold', 'whiskey']
+      },
+      { 
+        id: 'jack-daniels-tennessee-rye', 
+        name: "Jack Daniel's Tennessee Rye", 
+        displayName: "Jack Daniel's Tennessee Rye",
+        category: 'Rye Whiskey', 
+        entityName: 'Jack Daniel Distillery',
+        type: 'Brand',
+        active: true,
+        keywords: ['jack', 'daniels', 'tennessee', 'rye', 'whiskey']
+      },
+      { 
+        id: 'jack-daniels-triple-mash', 
+        name: "Jack Daniel's Triple Mash", 
+        displayName: "Jack Daniel's Triple Mash",
+        category: 'Tennessee Whiskey', 
+        entityName: 'Jack Daniel Distillery',
+        type: 'Brand',
+        active: true,
+        keywords: ['jack', 'daniels', 'triple', 'mash', 'whiskey']
+      },
+
+      // Jack Daniel's Flavored
+      { 
+        id: 'jack-daniels-tennessee-apple', 
+        name: "Jack Daniel's Tennessee Apple", 
+        displayName: "Jack Daniel's Tennessee Apple",
+        category: 'Flavored Whiskey', 
+        entityName: 'Jack Daniel Distillery',
+        type: 'Brand',
+        active: true,
+        keywords: ['jack', 'daniels', 'tennessee', 'apple', 'flavored']
+      },
+      { 
+        id: 'jack-daniels-tennessee-honey', 
+        name: "Jack Daniel's Tennessee Honey", 
+        displayName: "Jack Daniel's Tennessee Honey",
+        category: 'Flavored Whiskey', 
+        entityName: 'Jack Daniel Distillery',
+        type: 'Brand',
+        active: true,
+        keywords: ['jack', 'daniels', 'tennessee', 'honey', 'flavored']
+      },
+      { 
+        id: 'jack-daniels-tennessee-fire', 
+        name: "Jack Daniel's Tennessee Fire", 
+        displayName: "Jack Daniel's Tennessee Fire",
+        category: 'Flavored Whiskey', 
+        entityName: 'Jack Daniel Distillery',
+        type: 'Brand',
+        active: true,
+        keywords: ['jack', 'daniels', 'tennessee', 'fire', 'flavored']
+      },
+      { 
+        id: 'jack-daniels-winter-jack', 
+        name: "Jack Daniel's Winter Jack", 
+        displayName: "Jack Daniel's Winter Jack",
+        category: 'Seasonal Whiskey', 
+        entityName: 'Jack Daniel Distillery',
+        type: 'Brand',
+        active: true,
+        keywords: ['jack', 'daniels', 'winter', 'seasonal']
+      },
+
+      // Gentleman Jack
+      { 
+        id: 'gentleman-jack', 
+        name: 'Gentleman Jack', 
+        displayName: 'Gentleman Jack',
+        category: 'Tennessee Whiskey', 
+        entityName: 'Jack Daniel Distillery',
+        type: 'Brand',
+        active: true,
+        keywords: ['gentleman', 'jack', 'whiskey']
+      },
+
+      // RTD Products
+      { 
+        id: 'jack-cola-ginger', 
+        name: 'Jack & Cola / Ginger / Berry (RTD)', 
+        displayName: 'Jack & Cola / Ginger / Berry (RTD)',
+        category: 'Ready to Drink', 
+        entityName: 'Jack Daniel Distillery',
+        type: 'Brand',
+        active: true,
+        keywords: ['jack', 'cola', 'ginger', 'berry', 'rtd', 'ready', 'drink']
+      },
+      { 
+        id: 'jack-apple-tonic', 
+        name: 'Jack Apple & Tonic (RTD)', 
+        displayName: 'Jack Apple & Tonic (RTD)',
+        category: 'Ready to Drink', 
+        entityName: 'Jack Daniel Distillery',
+        type: 'Brand',
+        active: true,
+        keywords: ['jack', 'apple', 'tonic', 'rtd', 'ready', 'drink']
+      },
+      { 
+        id: 'jack-apple-fizz', 
+        name: 'Jack Apple Fizz (RTD)', 
+        displayName: 'Jack Apple Fizz (RTD)',
+        category: 'Ready to Drink', 
+        entityName: 'Jack Daniel Distillery',
+        type: 'Brand',
+        active: true,
+        keywords: ['jack', 'apple', 'fizz', 'rtd', 'ready', 'drink']
+      },
+      { 
+        id: 'jack-honey-lemonade', 
+        name: 'Jack Honey & Lemonade (RTD)', 
+        displayName: 'Jack Honey & Lemonade (RTD)',
+        category: 'Ready to Drink', 
+        entityName: 'Jack Daniel Distillery',
+        type: 'Brand',
+        active: true,
+        keywords: ['jack', 'honey', 'lemonade', 'rtd', 'ready', 'drink']
+      },
+      { 
+        id: 'jack-daniels-lynchburg', 
+        name: "Jack Daniel's Lynchburg Lemonade (RTD)", 
+        displayName: "Jack Daniel's Lynchburg Lemonade (RTD)",
+        category: 'Ready to Drink', 
+        entityName: 'Jack Daniel Distillery',
+        type: 'Brand',
+        active: true,
+        keywords: ['jack', 'daniels', 'lynchburg', 'lemonade', 'rtd']
+      },
+      { 
+        id: 'jack-daniels-country', 
+        name: "Jack Daniel's Country Cocktails", 
+        displayName: "Jack Daniel's Country Cocktails",
+        category: 'Ready to Drink', 
+        entityName: 'Jack Daniel Distillery',
+        type: 'Brand',
+        active: true,
+        keywords: ['jack', 'daniels', 'country', 'cocktails', 'rtd']
+      },
+      { 
+        id: 'gentleman-whiskey', 
+        name: 'Gentleman Jack Whiskey Sour (RTD)', 
+        displayName: 'Gentleman Jack Whiskey Sour (RTD)',
+        category: 'Ready to Drink', 
+        entityName: 'Jack Daniel Distillery',
+        type: 'Brand',
+        active: true,
+        keywords: ['gentleman', 'jack', 'whiskey', 'sour', 'rtd']
+      },
+
+      // Bourbon Brands
+      { 
+        id: 'old-forester', 
+        name: 'Old Forester', 
+        displayName: 'Old Forester',
+        category: 'Bourbon', 
+        entityName: 'Brown-Forman Distillery',
+        type: 'Brand',
+        active: true,
+        keywords: ['old', 'forester', 'bourbon']
+      },
+      { 
+        id: 'woodford-reserve', 
+        name: 'Woodford Reserve', 
+        displayName: 'Woodford Reserve',
+        category: 'Bourbon', 
+        entityName: 'Brown-Forman Distillery',
+        type: 'Brand',
+        active: true,
+        keywords: ['woodford', 'reserve', 'bourbon']
+      },
+      { 
+        id: 'coopers-craft', 
+        name: "Cooper's Craft", 
+        displayName: "Cooper's Craft",
+        category: 'Bourbon', 
+        entityName: 'Brown-Forman Distillery',
+        type: 'Brand',
+        active: true,
+        keywords: ['coopers', 'craft', 'bourbon']
+      },
+
+      // Scotch Whisky
+      { 
+        id: 'the-glendronnach', 
+        name: 'The GlenDronach', 
+        displayName: 'The GlenDronach',
+        category: 'Single Malt Scotch', 
+        entityName: 'The GlenDronach Distillery',
+        type: 'Brand',
+        active: true,
+        keywords: ['glendronnach', 'scotch', 'single', 'malt']
+      },
+      { 
+        id: 'glenglassaugh', 
+        name: 'Glenglassaugh', 
+        displayName: 'Glenglassaugh',
+        category: 'Single Malt Scotch', 
+        entityName: 'Glenglassaugh Distillery',
+        type: 'Brand',
+        active: true,
+        keywords: ['glenglassaugh', 'scotch', 'single', 'malt']
+      },
+
+      // Irish Whiskey
+      { 
+        id: 'slane-irish-whiskey', 
+        name: 'Slane Irish Whiskey', 
+        displayName: 'Slane Irish Whiskey',
+        category: 'Irish Whiskey', 
+        entityName: 'Slane Distillery',
+        type: 'Brand',
+        active: true,
+        keywords: ['slane', 'irish', 'whiskey']
+      },
+
+      // Gin
+      { 
+        id: 'gin-mare', 
+        name: 'Gin Mare', 
+        displayName: 'Gin Mare',
+        category: 'Premium Gin', 
+        entityName: 'Brown-Forman Spain',
+        type: 'Brand',
+        active: true,
+        keywords: ['gin', 'mare', 'mediterranean']
+      },
+      { 
+        id: 'fords-gin', 
+        name: "Ford's Gin", 
+        displayName: "Ford's Gin",
+        category: 'London Dry Gin', 
+        entityName: 'Brown-Forman Gin',
+        type: 'Brand',
+        active: true,
+        keywords: ['fords', 'gin', 'london', 'dry']
+      },
+
+      // Liqueur
+      { 
+        id: 'chambord', 
+        name: 'Chambord', 
+        displayName: 'Chambord',
+        category: 'Black Raspberry Liqueur', 
+        entityName: 'Brown-Forman France',
+        type: 'Brand',
+        active: true,
+        keywords: ['chambord', 'liqueur', 'raspberry']
+      },
+
+      // Multi-Brand Portfolios
+      { 
+        id: 'bf-portfolio', 
+        name: 'B-F Portfolio (multi-brand)', 
+        displayName: 'B-F Portfolio (multi-brand)',
+        category: 'Multi-Brand Portfolio', 
+        entityName: 'Brown-Forman Corporation',
+        type: 'Portfolio',
+        active: true,
+        keywords: ['portfolio', 'multi', 'brand', 'bf']
+      },
+      { 
+        id: 'cheers-host', 
+        name: 'Cheers to the Host (multi-brand)', 
+        displayName: 'Cheers to the Host (multi-brand)',
+        category: 'Multi-Brand Campaign', 
+        entityName: 'Brown-Forman Corporation',
+        type: 'Portfolio',
+        active: true,
+        keywords: ['cheers', 'host', 'multi', 'brand', 'campaign']
+      },
+      { 
+        id: 'jack-daniels-fob', 
+        name: "Jack Daniel's FOB (multi-brand)", 
+        displayName: "Jack Daniel's FOB (multi-brand)",
+        category: 'Multi-Brand Portfolio', 
+        entityName: 'Jack Daniel Distillery',
+        type: 'Portfolio',
+        active: true,
+        keywords: ['jack', 'daniels', 'fob', 'multi', 'brand']
+      },
+      { 
+        id: 'master-craft-academy', 
+        name: 'Master Craft Academy (multi-brand)', 
+        displayName: 'Master Craft Academy (multi-brand)',
+        category: 'Educational Portfolio', 
+        entityName: 'Brown-Forman Corporation',
+        type: 'Portfolio',
+        active: true,
+        keywords: ['master', 'craft', 'academy', 'multi', 'brand', 'education']
+      }
+    ];
+  }
+
+  initializeCountryData() {
+    return [
+      { code: 'US', name: 'United States', language: 'English', region: 'North America', active: true },
+      { code: 'GB', name: 'United Kingdom', language: 'English', region: 'Europe', active: true },
+      { code: 'CA', name: 'Canada', language: 'English/French', region: 'North America', active: true },
+      { code: 'AU', name: 'Australia', language: 'English', region: 'Asia Pacific', active: true },
+      { code: 'DE', name: 'Germany', language: 'German', region: 'Europe', active: true },
+      { code: 'FR', name: 'France', language: 'French', region: 'Europe', active: true },
+      { code: 'ES', name: 'Spain', language: 'Spanish', region: 'Europe', active: true },
+      { code: 'IT', name: 'Italy', language: 'Italian', region: 'Europe', active: true },
+      { code: 'JP', name: 'Japan', language: 'Japanese', region: 'Asia Pacific', active: true },
+      { code: 'MX', name: 'Mexico', language: 'Spanish', region: 'Latin America', active: true },
+      { code: 'BR', name: 'Brazil', language: 'Portuguese', region: 'Latin America', active: true },
+      { code: 'AR', name: 'Argentina', language: 'Spanish', region: 'Latin America', active: true },
+      { code: 'ZA', name: 'South Africa', language: 'English', region: 'Africa', active: true },
+      { code: 'SG', name: 'Singapore', language: 'English', region: 'Asia Pacific', active: true },
+      { code: 'HK', name: 'Hong Kong', language: 'English/Chinese', region: 'Asia Pacific', active: true },
+      { code: 'NL', name: 'Netherlands', language: 'Dutch', region: 'Europe', active: true },
+      { code: 'BE', name: 'Belgium', language: 'Dutch/French', region: 'Europe', active: true },
+      { code: 'CH', name: 'Switzerland', language: 'German/French', region: 'Europe', active: true },
+      { code: 'AT', name: 'Austria', language: 'German', region: 'Europe', active: true },
+      { code: 'SE', name: 'Sweden', language: 'Swedish', region: 'Europe', active: true },
+      { code: 'NO', name: 'Norway', language: 'Norwegian', region: 'Europe', active: true },
+      { code: 'DK', name: 'Denmark', language: 'Danish', region: 'Europe', active: true },
+      { code: 'FI', name: 'Finland', language: 'Finnish', region: 'Europe', active: true }
+    ];
+  }
+
+  initializeAssetTypeData() {
+    return [
+      { id: 'facebook-post', name: 'Facebook Post', category: 'Social Media', active: true },
+      { id: 'instagram-story', name: 'Instagram Story', category: 'Social Media', active: true },
+      { id: 'instagram-post', name: 'Instagram Post', category: 'Social Media', active: true },
+      { id: 'twitter-post', name: 'Twitter Post', category: 'Social Media', active: true },
+      { id: 'linkedin-post', name: 'LinkedIn Post', category: 'Social Media', active: true },
+      { id: 'tiktok-video', name: 'TikTok Video', category: 'Social Media', active: true },
+      { id: 'youtube-video', name: 'YouTube Video', category: 'Video Content', active: true },
+      { id: 'email-template', name: 'Email Template', category: 'Email Marketing', active: true },
+      { id: 'newsletter', name: 'Newsletter', category: 'Email Marketing', active: true },
+      { id: 'banner-ad', name: 'Banner Ad', category: 'Display Advertising', active: true },
+      { id: 'video-ad', name: 'Video Advertisement', category: 'Display Advertising', active: true },
+      { id: 'website-copy', name: 'Website Copy', category: 'Web Content', active: true },
+      { id: 'product-page', name: 'Product Page', category: 'Web Content', active: true },
+      { id: 'press-release', name: 'Press Release', category: 'PR Content', active: true },
+      { id: 'blog-post', name: 'Blog Post', category: 'Content Marketing', active: true },
+      { id: 'brochure', name: 'Brochure', category: 'Print Materials', active: true },
+      { id: 'flyer', name: 'Flyer', category: 'Print Materials', active: true },
+      { id: 'packaging', name: 'Packaging Copy', category: 'Product Packaging', active: true },
+      { id: 'pos-material', name: 'Point of Sale Material', category: 'Retail', active: true },
+      { id: 'event-signage', name: 'Event Signage', category: 'Events', active: true }
+    ];
   }
 
   async loadData() {
     try {
-      console.log('ExcelService: Loading data via Electron API...');
+      console.log('ExcelService: Loading enhanced data with real Brown-Forman brands...');
       
-      if (!window.electronAPI) {
-        throw new Error('Electron API not available');
-      }
-
-      const result = await window.electronAPI.loadExcelData();
-      
-      if (!result.success) {
-        throw new Error(result.error);
-      }
-
-      // Structure matching the actual Brown-Forman tool data
-      this.data = result.data || {
-        'Trademark Config': [
-          // Brand definitions matching screenshot
-          { Brand: 'Antiguo de Herradura', Entity: 'Brown-Forman', Category: 'Tequila', Active: true },
-          { Brand: 'Botucal', Entity: 'Brown-Forman', Category: 'Rum', Active: true },
-          { Brand: 'Diplomatico', Entity: 'Brown-Forman', Category: 'Rum', Active: true },
-          { Brand: 'Gentleman Jack', Entity: 'Brown-Forman', Category: 'Whiskey', Active: true },
-          { Brand: 'Herradura Tequila', Entity: 'Brown-Forman', Category: 'Tequila', Active: true },
-          { Brand: 'Jack Apple Fizz (RTD)', Entity: 'Brown-Forman', Category: 'RTD', Active: true },
-          { Brand: 'Jack Daniels FOB (multi-brand)', Entity: 'Brown-Forman', Category: 'Whiskey', Active: true },
-          { Brand: 'Jack Daniels Sinatra Select', Entity: 'Brown-Forman', Category: 'Whiskey', Active: true },
-          { Brand: 'Jack Daniels Tennessee Fire', Entity: 'Brown-Forman', Category: 'Whiskey', Active: true },
-          { Brand: 'Jack Daniels Winter Jack', Entity: 'Brown-Forman', Category: 'Whiskey', Active: true },
-          { Brand: 'Slane Irish Whiskey', Entity: 'Brown-Forman', Category: 'Whiskey', Active: true },
-          { Brand: 'B-F Portfolio (multi-brand)', Entity: 'Brown-Forman', Category: 'Multi-Brand', Active: true },
-          { Brand: 'Chambord', Entity: 'Brown-Forman', Category: 'Liqueur', Active: true },
-          { Brand: 'el Jimador New Mix', Entity: 'Brown-Forman', Category: 'RTD', Active: true },
-          { Brand: 'Gentleman Jack Whiskey Sour (RTD)', Entity: 'Brown-Forman', Category: 'RTD', Active: true },
-          { Brand: 'Jack & Cola / Ginger / Berry (RTD)', Entity: 'Brown-Forman', Category: 'RTD', Active: true },
-          { Brand: 'Jack Daniels Bonded Series', Entity: 'Brown-Forman', Category: 'Whiskey', Active: true },
-          { Brand: 'Jack Daniels Lynchburg Lemonade (RTD)', Entity: 'Brown-Forman', Category: 'RTD', Active: true },
-          { Brand: 'Jack Daniels Single Barrel Series', Entity: 'Brown-Forman', Category: 'Whiskey', Active: true },
-          { Brand: 'Jack Daniels Tennessee Honey', Entity: 'Brown-Forman', Category: 'Whiskey', Active: true },
-          { Brand: 'Jack Honey & Lemonade (RTD)', Entity: 'Brown-Forman', Category: 'RTD', Active: true },
-          { Brand: 'The Glendronach', Entity: 'Brown-Forman', Category: 'Whiskey', Active: true },
-          { Brand: 'Cheers to the Host (multi-brand)', Entity: 'Brown-Forman', Category: 'Multi-Brand', Active: true },
-          { Brand: 'el Jimador Tequila', Entity: 'Brown-Forman', Category: 'Tequila', Active: true },
-          { Brand: 'Gin Mare', Entity: 'Brown-Forman', Category: 'Gin', Active: true },
-          { Brand: 'Jack & Seltzer (RTD)', Entity: 'Brown-Forman', Category: 'RTD', Active: true },
-          { Brand: 'Jack Daniels Bottled in Bond', Entity: 'Brown-Forman', Category: 'Whiskey', Active: true },
-          { Brand: 'Jack Daniels No. 27 Gold', Entity: 'Brown-Forman', Category: 'Whiskey', Active: true },
-          { Brand: 'Jack Daniels Tennessee Apple', Entity: 'Brown-Forman', Category: 'Whiskey', Active: true },
-          { Brand: 'Jack Daniels Tennessee Rye', Entity: 'Brown-Forman', Category: 'Whiskey', Active: true },
-          { Brand: 'Master Craft Academy (multi-brand)', Entity: 'Brown-Forman', Category: 'Multi-Brand', Active: true },
-          { Brand: 'Woodford Reserve', Entity: 'Brown-Forman', Category: 'Whiskey', Active: true },
-          { Brand: 'Benriach', Entity: 'Brown-Forman', Category: 'Whiskey', Active: true },
-          { Brand: 'Coopers Craft', Entity: 'Brown-Forman', Category: 'Whiskey', Active: true },
-          { Brand: 'Fords Gin', Entity: 'Brown-Forman', Category: 'Gin', Active: true },
-          { Brand: 'Glenglassaugh', Entity: 'Brown-Forman', Category: 'Whiskey', Active: true },
-          { Brand: 'Jack Apple & Tonic (RTD)', Entity: 'Brown-Forman', Category: 'RTD', Active: true },
-          { Brand: 'Jack Daniels Country Cocktails', Entity: 'Brown-Forman', Category: 'RTD', Active: true },
-          { Brand: 'Jack Daniels Old No. 7', Entity: 'Brown-Forman', Category: 'Whiskey', Active: true },
-          { Brand: 'Jack Daniels Tennessee Blackberry', Entity: 'Brown-Forman', Category: 'Whiskey', Active: true },
-          { Brand: 'Jack Daniels Triple Mash', Entity: 'Brown-Forman', Category: 'Whiskey', Active: true },
-          { Brand: 'Old Forester', Entity: 'Brown-Forman', Category: 'Whiskey', Active: true }
-        ],
-        
-        'CountryLanguage': [
-          { Country: 'United States', CountryCode: 'US', Language: 'English', MarketSpecific: 'TTB Mandatory Required', RegionCode: 'NA' },
-          { Country: 'Canada', CountryCode: 'CA', Language: 'English', MarketSpecific: 'Health Canada Requirements', RegionCode: 'NA' },
-          { Country: 'United Kingdom', CountryCode: 'UK', Language: 'English', MarketSpecific: 'UK Advertising Standards', RegionCode: 'EU' },
-          { Country: 'Germany', CountryCode: 'DE', Language: 'German', MarketSpecific: 'German Advertising Law', RegionCode: 'EU' },
-          { Country: 'France', CountryCode: 'FR', Language: 'French', MarketSpecific: 'Loi Evin Compliance', RegionCode: 'EU' },
-          { Country: 'Australia', CountryCode: 'AU', Language: 'English', MarketSpecific: 'ACCC Guidelines', RegionCode: 'APAC' },
-          { Country: 'Japan', CountryCode: 'JP', Language: 'Japanese', MarketSpecific: 'Japanese Liquor Tax Law', RegionCode: 'APAC' },
-          { Country: 'Mexico', CountryCode: 'MX', Language: 'Spanish', MarketSpecific: 'COFEPRIS Requirements', RegionCode: 'LATAM' },
-          { Country: 'Brazil', CountryCode: 'BR', Language: 'Portuguese', MarketSpecific: 'ANVISA Compliance', RegionCode: 'LATAM' },
-          { Country: 'South Africa', CountryCode: 'ZA', Language: 'English', MarketSpecific: 'LCDA Regulations', RegionCode: 'AFRICA' }
-        ],
-
-        'Trademark Language': [
-          { Country: 'US', RegisteredSymbol: '®', ReserveSymbol: '™', Usage: 'Post-brand name' },
-          { Country: 'CA', RegisteredSymbol: '®', ReserveSymbol: '™', Usage: 'Post-brand name' },
-          { Country: 'UK', RegisteredSymbol: '®', ReserveSymbol: '™', Usage: 'Post-brand name' },
-          { Country: 'DE', RegisteredSymbol: '®', ReserveSymbol: '™', Usage: 'Post-brand name' },
-          { Country: 'FR', RegisteredSymbol: '®', ReserveSymbol: '™', Usage: 'Post-brand name' },
-          { Country: 'AU', RegisteredSymbol: '®', ReserveSymbol: '™', Usage: 'Post-brand name' },
-          { Country: 'JP', RegisteredSymbol: '®', ReserveSymbol: '™', Usage: 'Post-brand name' },
-          { Country: 'MX', RegisteredSymbol: '®', ReserveSymbol: '™', Usage: 'Post-brand name' },
-          { Country: 'BR', RegisteredSymbol: '®', ReserveSymbol: '™', Usage: 'Post-brand name' },
-          { Country: 'ZA', RegisteredSymbol: '®', ReserveSymbol: '™', Usage: 'Post-brand name' }
-        ],
-
-        'Asset Types': [
-          { AssetType: 'Website', Description: 'Website content and landing pages', RequiresAge: true, CharacterLimit: null },
-          { AssetType: 'Social Media', Description: 'Social media posts and content', RequiresAge: true, CharacterLimit: 280 },
-          { AssetType: 'Digital Advertisement', Description: 'Digital advertising banners and content', RequiresAge: true, CharacterLimit: 150 },
-          { AssetType: 'Email Marketing', Description: 'Email campaigns and newsletters', RequiresAge: true, CharacterLimit: null },
-          { AssetType: 'Mobile App', Description: 'Mobile application content', RequiresAge: true, CharacterLimit: 100 },
-          { AssetType: 'Video/Audio', Description: 'Video and audio content', RequiresAge: true, CharacterLimit: null },
-          { AssetType: 'E-commerce', Description: 'Online retail and product pages', RequiresAge: true, CharacterLimit: null },
-          { AssetType: 'Digital Brochure', Description: 'Digital brochures and catalogs', RequiresAge: true, CharacterLimit: null }
-        ],
-
-        'Language Dependent Variables': [
-          { Country: 'US', ResponsibilityText: 'Please drink responsibly.', AgeVerification: 'You must be 21 or older to enter.', ForwardNotice: 'Please share responsibly.' },
-          { Country: 'CA', ResponsibilityText: 'Please drink responsibly.', AgeVerification: 'You must be 19 or older to enter.', ForwardNotice: 'Please share responsibly.' },
-          { Country: 'UK', ResponsibilityText: 'Please drink responsibly.', AgeVerification: 'You must be 18 or older to enter.', ForwardNotice: 'Please share responsibly.' },
-          { Country: 'DE', ResponsibilityText: 'Bitte trinken Sie verantwortungsvoll.', AgeVerification: 'Sie müssen 18 oder älter sein.', ForwardNotice: 'Bitte verantwortungsvoll teilen.' },
-          { Country: 'FR', ResponsibilityText: 'À consommer avec modération.', AgeVerification: 'Vous devez avoir 18 ans ou plus.', ForwardNotice: 'Partagez de manière responsable.' },
-          { Country: 'AU', ResponsibilityText: 'Please drink responsibly.', AgeVerification: 'You must be 18 or older to enter.', ForwardNotice: 'Please share responsibly.' },
-          { Country: 'JP', ResponsibilityText: '適量飲酒を心がけましょう。', AgeVerification: '20歳以上の方のみご利用いただけます。', ForwardNotice: '責任を持って共有してください。' },
-          { Country: 'MX', ResponsibilityText: 'Bebe con moderación.', AgeVerification: 'Debes tener 18 años o más.', ForwardNotice: 'Comparte responsablemente.' },
-          { Country: 'BR', ResponsibilityText: 'Beba com moderação.', AgeVerification: 'Você deve ter 18 anos ou mais.', ForwardNotice: 'Compartilhe com responsabilidade.' },
-          { Country: 'ZA', ResponsibilityText: 'Please drink responsibly.', AgeVerification: 'You must be 18 or older to enter.', ForwardNotice: 'Please share responsibly.' }
-        ],
-
-        'Template Structures': [
-          {
-            AssetType: 'Website',
-            Template: '{BRAND_NAME}{TRADEMARK_SYMBOL}\n\n{AGE_VERIFICATION}\n\n{RESPONSIBILITY_TEXT}\n\n{FORWARD_NOTICE}',
-            RequiredElements: ['BRAND_NAME', 'TRADEMARK_SYMBOL', 'AGE_VERIFICATION', 'RESPONSIBILITY_TEXT']
-          },
-          {
-            AssetType: 'Social Media',
-            Template: '{BRAND_NAME}{TRADEMARK_SYMBOL} {RESPONSIBILITY_TEXT} {FORWARD_NOTICE}',
-            RequiredElements: ['BRAND_NAME', 'TRADEMARK_SYMBOL', 'RESPONSIBILITY_TEXT']
-          },
-          {
-            AssetType: 'Digital Advertisement',
-            Template: '{BRAND_NAME}{TRADEMARK_SYMBOL} {RESPONSIBILITY_TEXT}',
-            RequiredElements: ['BRAND_NAME', 'TRADEMARK_SYMBOL', 'RESPONSIBILITY_TEXT']
-          },
-          {
-            AssetType: 'Email Marketing',
-            Template: '{BRAND_NAME}{TRADEMARK_SYMBOL}\n\n{AGE_VERIFICATION}\n\n{RESPONSIBILITY_TEXT}\n\n{FORWARD_NOTICE}',
-            RequiredElements: ['BRAND_NAME', 'TRADEMARK_SYMBOL', 'RESPONSIBILITY_TEXT']
-          },
-          {
-            AssetType: 'Mobile App',
-            Template: '{BRAND_NAME}{TRADEMARK_SYMBOL} {RESPONSIBILITY_TEXT}',
-            RequiredElements: ['BRAND_NAME', 'TRADEMARK_SYMBOL', 'RESPONSIBILITY_TEXT']
-          },
-          {
-            AssetType: 'Video/Audio',
-            Template: '{BRAND_NAME}{TRADEMARK_SYMBOL}\n\n{RESPONSIBILITY_TEXT}',
-            RequiredElements: ['BRAND_NAME', 'TRADEMARK_SYMBOL', 'RESPONSIBILITY_TEXT']
-          },
-          {
-            AssetType: 'E-commerce',
-            Template: '{BRAND_NAME}{TRADEMARK_SYMBOL}\n\n{AGE_VERIFICATION}\n\n{RESPONSIBILITY_TEXT}',
-            RequiredElements: ['BRAND_NAME', 'TRADEMARK_SYMBOL', 'AGE_VERIFICATION', 'RESPONSIBILITY_TEXT']
-          },
-          {
-            AssetType: 'Digital Brochure',
-            Template: '{BRAND_NAME}{TRADEMARK_SYMBOL}\n\n{RESPONSIBILITY_TEXT}\n\n{FORWARD_NOTICE}',
-            RequiredElements: ['BRAND_NAME', 'TRADEMARK_SYMBOL', 'RESPONSIBILITY_TEXT']
+      // Use Electron IPC to load Excel file (if available)
+      if (window.electronAPI) {
+        try {
+          const result = await window.electronAPI.loadExcelData();
+          if (result.success) {
+            console.log('ExcelService: Excel file loaded via Electron API');
           }
-        ],
+        } catch (error) {
+          console.warn('ExcelService: Electron API not available, using mock data');
+        }
+      }
 
+      // Create enhanced data structure with real Brown-Forman data
+      this.data = {
+        'Trademark Config': this.brandData.map(brand => ({
+          ID: brand.id,
+          Name: brand.displayName,
+          Type: brand.type,
+          Entity: brand.entityName,
+          Category: brand.category,
+          Active: brand.active,
+          Keywords: brand.keywords.join(', ')
+        })),
+        'CountryLanguage': this.countryData.map(country => ({
+          CountryCode: country.code,
+          CountryName: country.name,
+          Language: country.language,
+          Region: country.region,
+          Active: country.active
+        })),
+        'Trademark Language': [],
+        'Trademark Structure': [],
+        'Language Dependent Variables': [],
+        'Overall Structure': this.assetTypeData.map(asset => ({
+          AssetType: asset.name,
+          Category: asset.category,
+          ID: asset.id,
+          Active: asset.active
+        })),
         'Help Text': [
           {
             Section: 'Instructions',
-            Content: 'Please follow the instructions below to generate the appropriate legal copy.'
-          },
-          {
-            Section: 'Steps',
-            Content: '1. Select your Asset Type\n2. Select your Country\n3. Select the brand(s) associated with your asset\n4. Click Generate\n5. Once your copy is generated, click the "Copy & Close" button to copy the generated text to your clipboard'
-          },
-          {
-            Section: 'AdditionalNotes',
-            Content: 'Country/Market Specifics: There will be additional detailed instructions included with your copy if your market has local requirements.\n\nUS teams: Please be sure to add the TTB Mandatory statement when prompted.\n\nMulti-Brands: If you need copy for a multi-brand item, such as Bar-Fabric, please DO NOT select any other single brands, ie. Benriach, because the copy will not generate.'
+            Content: `<div class="help-content">
+              <h3>How to Use the Digital Compliance Tool</h3>
+              <ol>
+                <li><strong>Select Asset Type:</strong> Choose the type of marketing asset you're creating</li>
+                <li><strong>Select Country:</strong> Choose your target market</li>
+                <li><strong>Select Brands:</strong> Choose the brands to include in your copy</li>
+                <li><strong>Generate:</strong> Click generate to create compliant legal copy</li>
+              </ol>
+              <p><em>For multi-brand campaigns, select only multi-brand items like Bar-Fabric.</em></p>
+            </div>`
           }
         ]
       };
       
       this.isLoaded = true;
-      this.cache.clear();
 
-      console.log('ExcelService: Brown-Forman compliance data loaded successfully');
+      console.log('ExcelService: Enhanced data loaded successfully');
+      console.log(`- Brands: ${this.brandData.length}`);
+      console.log(`- Countries: ${this.countryData.length}`);
+      console.log(`- Asset Types: ${this.assetTypeData.length}`);
 
       return {
         success: true,
         data: this.data
       };
     } catch (error) {
-      console.error('ExcelService: Error loading data:', error);
+      console.error('ExcelService: Error loading enhanced data:', error);
       return {
         success: false,
         error: error.message
@@ -197,172 +552,8 @@ export class ExcelService {
     }
   }
 
-  // Enhanced helper methods matching the actual workflow
-  getBrands() {
-    if (!this.isLoaded) return [];
-    
-    const cacheKey = 'brands';
-    if (this.cache.has(cacheKey)) {
-      return this.cache.get(cacheKey);
-    }
-
-    const brands = this.data['Trademark Config']
-      ?.filter(item => item.Active)
-      ?.map(item => ({
-        id: item.Brand.toLowerCase().replace(/[^a-z0-9]/g, '-'),
-        name: item.Brand,
-        entity: item.Entity,
-        category: item.Category,
-        isMultiBrand: item.Category === 'Multi-Brand'
-      }))
-      ?.sort((a, b) => a.name.localeCompare(b.name)) || [];
-    
-    this.cache.set(cacheKey, brands);
-    return brands;
-  }
-
-  getCountries() {
-    if (!this.isLoaded) return [];
-    
-    const cacheKey = 'countries';
-    if (this.cache.has(cacheKey)) {
-      return this.cache.get(cacheKey);
-    }
-
-    const countries = this.data['CountryLanguage']?.map(item => ({
-      code: item.CountryCode,
-      name: item.Country,
-      language: item.Language,
-      marketSpecific: item.MarketSpecific,
-      region: item.RegionCode
-    })) || [];
-    
-    this.cache.set(cacheKey, countries);
-    return countries;
-  }
-
-  getAssetTypes() {
-    if (!this.isLoaded) return [];
-    
-    const cacheKey = 'assetTypes';
-    if (this.cache.has(cacheKey)) {
-      return this.cache.get(cacheKey);
-    }
-
-    const assetTypes = this.data['Asset Types']?.map(item => ({
-      type: item.AssetType,
-      description: item.Description,
-      requiresAge: item.RequiresAge,
-      characterLimit: item.CharacterLimit
-    })) || [];
-    
-    this.cache.set(cacheKey, assetTypes);
-    return assetTypes;
-  }
-
-  // Template engine methods
-  getTemplateByAssetType(assetType) {
-    if (!this.isLoaded) return null;
-    
-    return this.data['Template Structures']?.find(
-      template => template.AssetType === assetType
-    ) || null;
-  }
-
-  getLanguageVariablesByCountry(countryCode) {
-    if (!this.isLoaded) return null;
-    
-    return this.data['Language Dependent Variables']?.find(
-      vars => vars.Country === countryCode
-    ) || null;
-  }
-
-  getTrademarkSymbolByCountry(countryCode) {
-    if (!this.isLoaded) return { registered: '®', reserve: '™' };
-    
-    const trademark = this.data['Trademark Language']?.find(
-      tm => tm.Country === countryCode
-    );
-    
-    return {
-      registered: trademark?.RegisteredSymbol || '®',
-      reserve: trademark?.ReserveSymbol || '™',
-      usage: trademark?.Usage || 'Post-brand name'
-    };
-  }
-
-  getHelpText(section = 'Instructions') {
-    if (!this.isLoaded) return '';
-    
-    const helpItem = this.data['Help Text']?.find(
-      item => item.Section === section
-    );
-    
-    return helpItem?.Content || '';
-  }
-
-  // Utility methods
-  getBrandsByCategory(category) {
-    return this.getBrands().filter(brand => brand.category === category);
-  }
-
-  getMultiBrands() {
-    return this.getBrandsByCategory('Multi-Brand');
-  }
-
-  getSingleBrands() {
-    return this.getBrands().filter(brand => brand.category !== 'Multi-Brand');
-  }
-
-  validateBrandSelection(selectedBrands) {
-    const brands = selectedBrands.map(id => this.getBrandById(id)).filter(Boolean);
-    const hasMultiBrand = brands.some(brand => brand.isMultiBrand);
-    const hasSingleBrand = brands.some(brand => !brand.isMultiBrand);
-    
-    if (hasMultiBrand && hasSingleBrand) {
-      return {
-        isValid: false,
-        error: 'Cannot select multi-brand items with single brands. Please select either multi-brand OR single brands, not both.'
-      };
-    }
-    
-    return { isValid: true };
-  }
-
-  // Existing methods for compatibility
-  getBrandById(id) {
-    return this.getBrands().find(brand => brand.id === id) || null;
-  }
-
-  getCountryById(code) {
-    return this.getCountries().find(country => country.code === code) || null;
-  }
-
-  getAssetTypeByName(name) {
-    return this.getAssetTypes().find(type => type.type === name) || null;
-  }
-
-  searchBrands(query) {
-    if (!query) return this.getBrands();
-    
-    const lowercaseQuery = query.toLowerCase();
-    return this.getBrands().filter(brand => 
-      brand.name.toLowerCase().includes(lowercaseQuery) ||
-      brand.category.toLowerCase().includes(lowercaseQuery)
-    );
-  }
-
-  // Legacy method names for compatibility
-  getTemplateStructure(assetType) {
-    return this.getTemplateByAssetType(assetType);
-  }
-
-  getLanguageVariables(countryCode) {
-    return this.getLanguageVariablesByCountry(countryCode);
-  }
-
-  getTrademarkStructure(countryCode) {
-    return this.getTrademarkSymbolByCountry(countryCode);
+  isDataLoaded() {
+    return this.isLoaded;
   }
 
   getData() {
@@ -373,19 +564,155 @@ export class ExcelService {
     return this.data;
   }
 
-  isDataLoaded() {
-    return this.isLoaded;
+  // Enhanced brand methods with real data
+  getBrands() {
+    return this.brandData.filter(brand => brand.active).map(brand => ({
+      id: brand.id,
+      name: brand.name,
+      displayName: brand.displayName,
+      category: brand.category,
+      entityName: brand.entityName,
+      type: brand.type,
+      keywords: brand.keywords
+    }));
+  }
+
+  getBrandById(id) {
+    return this.brandData.find(brand => brand.id === id) || null;
+  }
+
+  searchBrands(query) {
+    if (!query || query.trim().length === 0) {
+      return this.getBrands();
+    }
+    
+    const searchTerm = query.toLowerCase().trim();
+    return this.brandData
+      .filter(brand => 
+        brand.active && (
+          brand.name.toLowerCase().includes(searchTerm) ||
+          brand.displayName.toLowerCase().includes(searchTerm) ||
+          brand.category.toLowerCase().includes(searchTerm) ||
+          brand.keywords.some(keyword => keyword.toLowerCase().includes(searchTerm))
+        )
+      )
+      .map(brand => ({
+        id: brand.id,
+        name: brand.name,
+        displayName: brand.displayName,
+        category: brand.category,
+        entityName: brand.entityName,
+        type: brand.type,
+        keywords: brand.keywords
+      }));
+  }
+
+  // Enhanced country methods
+  getCountries() {
+    return this.countryData.filter(country => country.active).map(country => ({
+      code: country.code,
+      name: country.name,
+      language: country.language,
+      region: country.region
+    }));
+  }
+
+  getCountryById(code) {
+    return this.countryData.find(country => country.code === code) || null;
+  }
+
+  // Enhanced asset type methods
+  getAssetTypes() {
+    return this.assetTypeData.filter(asset => asset.active).map(asset => ({
+      id: asset.id,
+      name: asset.name,
+      category: asset.category
+    }));
+  }
+
+  getAssetTypeByName(name) {
+    return this.assetTypeData.find(asset => 
+      asset.name.toLowerCase() === name.toLowerCase()
+    ) || null;
+  }
+
+  getAssetTypeById(id) {
+    return this.assetTypeData.find(asset => asset.id === id) || null;
+  }
+
+  // Template and structure methods (placeholders for future enhancement)
+  getTemplateStructure(assetType) {
+    // This will be enhanced when templateService is fully implemented
+    return {
+      assetType: assetType,
+      structure: 'template-placeholder',
+      placeholders: ['{{BRAND_NAME}}', '{{TRADEMARK_NOTICE}}', '{{COMPLIANCE_TEXT}}']
+    };
+  }
+
+  getLanguageVariables(language) {
+    // Placeholder for language-specific variables
+    const variables = {
+      'English': {
+        drinkResponsibly: 'Please drink responsibly.',
+        trademark: '® Registered trademark',
+        copyright: '© Brown-Forman Corporation'
+      },
+      'Spanish': {
+        drinkResponsibly: 'Bebe con responsabilidad.',
+        trademark: '® Marca registrada',
+        copyright: '© Brown-Forman Corporation'
+      },
+      'French': {
+        drinkResponsibly: 'À consommer avec modération.',
+        trademark: '® Marque déposée',
+        copyright: '© Brown-Forman Corporation'
+      }
+    };
+    
+    return variables[language] || variables['English'];
+  }
+
+  getTrademarkStructure(type) {
+    // Placeholder for trademark structure
+    return {
+      type: type,
+      format: 'standard',
+      requirements: ['trademark-notice', 'responsibility-message', 'legal-disclaimer']
+    };
+  }
+
+  getHelpText() {
+    const helpData = this.data?.['Help Text'];
+    if (helpData && helpData.length > 0) {
+      return helpData[0].Content || '';
+    }
+    return `
+      <div class="help-content">
+        <h3>Digital Compliance Legal Copy Generator</h3>
+        <p>This tool helps you generate legally compliant copy for Brown-Forman brands across different markets and asset types.</p>
+        <p>Select your asset type, country, and brands to get started.</p>
+      </div>
+    `;
+  }
+
+  // Data statistics
+  getStats() {
+    return {
+      totalBrands: this.brandData.length,
+      activeBrands: this.brandData.filter(b => b.active).length,
+      totalCountries: this.countryData.length,
+      activeCountries: this.countryData.filter(c => c.active).length,
+      totalAssetTypes: this.assetTypeData.length,
+      activeAssetTypes: this.assetTypeData.filter(a => a.active).length,
+      lastUpdated: new Date().toISOString()
+    };
   }
 
   async reload() {
     this.isLoaded = false;
     this.data = null;
-    this.cache.clear();
     return await this.loadData();
-  }
-
-  clearCache() {
-    this.cache.clear();
   }
 }
 

@@ -1,280 +1,500 @@
 // src/renderer/services/templateService.js
-// Template Engine for Copy Generation (Artifact 6)
+// Template Service for generating Brown-Forman legal copy
 
-import excelService from './excelService.js';
-import validationService from './validationService.js';
+import excelService from './excelService';
+import validationService from './validationService';
 
-export class TemplateService {
+class TemplateService {
   constructor() {
-    this.excelService = excelService;
-    this.validationService = validationService;
-    this.generationHistory = [];
+    this.templates = this.initializeTemplates();
+    this.complianceRules = this.initializeComplianceRules();
   }
 
+  initializeTemplates() {
+    return {
+      'Facebook Post': {
+        structure: 'social-media-post',
+        maxLength: 2000,
+        requirements: ['brand-mention', 'trademark-notice', 'responsibility-message'],
+        template: `{{CONTENT_INTRO}}
+
+{{BRAND_MENTIONS}}
+
+{{TRADEMARK_NOTICES}}
+
+{{RESPONSIBILITY_MESSAGE}}
+
+{{ADDITIONAL_DISCLAIMERS}}`
+      },
+      
+      'Instagram Story': {
+        structure: 'social-media-story',
+        maxLength: 1000,
+        requirements: ['brand-mention', 'trademark-notice', 'responsibility-message'],
+        template: `{{CONTENT_INTRO}}
+
+{{BRAND_MENTIONS}}
+
+{{TRADEMARK_NOTICES}}
+{{RESPONSIBILITY_MESSAGE}}`
+      },
+      
+      'Instagram Post': {
+        structure: 'social-media-post',
+        maxLength: 2200,
+        requirements: ['brand-mention', 'trademark-notice', 'responsibility-message'],
+        template: `{{CONTENT_INTRO}}
+
+{{BRAND_MENTIONS}}
+
+{{HASHTAGS}}
+
+{{TRADEMARK_NOTICES}}
+
+{{RESPONSIBILITY_MESSAGE}}`
+      },
+      
+      'Twitter Post': {
+        structure: 'social-media-micro',
+        maxLength: 280,
+        requirements: ['brand-mention', 'trademark-notice', 'responsibility-message-short'],
+        template: `{{CONTENT_INTRO}}
+
+{{BRAND_MENTIONS}}
+
+{{TRADEMARK_NOTICES}}
+{{RESPONSIBILITY_MESSAGE_SHORT}}`
+      },
+      
+      'LinkedIn Post': {
+        structure: 'professional-social',
+        maxLength: 3000,
+        requirements: ['brand-mention', 'trademark-notice', 'responsibility-message', 'corporate-disclaimer'],
+        template: `{{CONTENT_INTRO}}
+
+{{BRAND_MENTIONS}}
+
+{{CORPORATE_MESSAGE}}
+
+{{TRADEMARK_NOTICES}}
+
+{{RESPONSIBILITY_MESSAGE}}
+
+{{CORPORATE_DISCLAIMER}}`
+      },
+      
+      'Email Template': {
+        structure: 'email-marketing',
+        maxLength: 5000,
+        requirements: ['brand-mention', 'trademark-notice', 'responsibility-message', 'unsubscribe-notice'],
+        template: `{{EMAIL_HEADER}}
+
+{{CONTENT_INTRO}}
+
+{{BRAND_MENTIONS}}
+
+{{PRODUCT_INFORMATION}}
+
+{{TRADEMARK_NOTICES}}
+
+{{RESPONSIBILITY_MESSAGE}}
+
+{{LEGAL_DISCLAIMERS}}
+
+{{UNSUBSCRIBE_NOTICE}}`
+      },
+      
+      'Banner Ad': {
+        structure: 'display-advertising',
+        maxLength: 500,
+        requirements: ['brand-mention', 'trademark-notice', 'responsibility-message-micro'],
+        template: `{{HEADLINE}}
+
+{{BRAND_MENTIONS}}
+
+{{TRADEMARK_NOTICES}}
+{{RESPONSIBILITY_MESSAGE_MICRO}}`
+      },
+      
+      'Video Description': {
+        structure: 'video-content',
+        maxLength: 4000,
+        requirements: ['brand-mention', 'trademark-notice', 'responsibility-message', 'content-warning'],
+        template: `{{VIDEO_DESCRIPTION}}
+
+{{BRAND_MENTIONS}}
+
+{{CONTENT_WARNING}}
+
+{{TRADEMARK_NOTICES}}
+
+{{RESPONSIBILITY_MESSAGE}}
+
+{{ADDITIONAL_DISCLAIMERS}}`
+      },
+      
+      'Website Copy': {
+        structure: 'web-content',
+        maxLength: 8000,
+        requirements: ['brand-mention', 'trademark-notice', 'responsibility-message', 'privacy-policy', 'terms-conditions'],
+        template: `{{PAGE_CONTENT}}
+
+{{BRAND_MENTIONS}}
+
+{{TRADEMARK_NOTICES}}
+
+{{RESPONSIBILITY_MESSAGE}}
+
+{{PRIVACY_POLICY_LINK}}
+
+{{TERMS_CONDITIONS_LINK}}
+
+{{ADDITIONAL_LEGAL_TEXT}}`
+      }
+    };
+  }
+
+  initializeComplianceRules() {
+    return {
+      // US Compliance Rules
+      'US': {
+        responsibilityMessage: 'Please drink responsibly.',
+        ageGating: 'Must be 21+ to view this content.',
+        trademarkFormat: '{{BRAND}}® {{CATEGORY}}',
+        additionalDisclaimers: {
+          'Tennessee Whiskey': 'Tennessee Whiskey. 40% Alc/Vol. Distilled and Bottled by Jack Daniel Distillery.',
+          'Bourbon': 'Kentucky Straight Bourbon Whiskey. Distilled and Bottled by Brown-Forman.',
+          'Tequila': '100% Agave. Product of Mexico.',
+          'Rum': 'Caribbean Rum. Please enjoy responsibly.',
+          'Gin': 'Distilled Gin. Crafted with botanicals.',
+          'Ready to Drink': 'Ready-to-drink alcoholic beverage. Chill and serve.'
+        },
+        copyrightNotice: '© {{YEAR}} Brown-Forman Corporation, Louisville, KY'
+      },
+      
+      // UK Compliance Rules
+      'GB': {
+        responsibilityMessage: 'Please drink responsibly. For more information visit drinkaware.co.uk',
+        ageGating: 'Must be 18+ to view this content.',
+        trademarkFormat: '{{BRAND}}® {{CATEGORY}}',
+        additionalDisclaimers: {
+          'Tennessee Whiskey': 'American Whiskey. 40% Vol.',
+          'Bourbon': 'American Whiskey. 40% Vol.',
+          'Tequila': 'Tequila. 40% Vol. Product of Mexico.',
+          'Rum': 'Caribbean Rum. 40% Vol.',
+          'Gin': 'London Dry Gin. 40% Vol.',
+          'Ready to Drink': 'Ready-to-drink alcoholic beverage. Serve chilled.'
+        },
+        copyrightNotice: '© {{YEAR}} Brown-Forman Corporation'
+      },
+      
+      // Canadian Compliance Rules
+      'CA': {
+        responsibilityMessage: 'Please drink responsibly. / Veuillez boire de façon responsable.',
+        ageGating: 'Must be of legal drinking age to view this content.',
+        trademarkFormat: '{{BRAND}}® {{CATEGORY}}',
+        additionalDisclaimers: {
+          'Tennessee Whiskey': 'American Whiskey. 40% Alc./Vol.',
+          'Bourbon': 'American Whiskey. 40% Alc./Vol.',
+          'Tequila': 'Tequila. 40% Alc./Vol. Product of Mexico.',
+          'Rum': 'Caribbean Rum. 40% Alc./Vol.',
+          'Gin': 'Gin. 40% Alc./Vol.',
+          'Ready to Drink': 'Alcoholic beverage. Serve responsibly.'
+        },
+        copyrightNotice: '© {{YEAR}} Brown-Forman Corporation'
+      },
+      
+      // German Compliance Rules
+      'DE': {
+        responsibilityMessage: 'Bitte trinken Sie verantwortungsvoll.',
+        ageGating: 'Nur für Personen ab 18 Jahren.',
+        trademarkFormat: '{{BRAND}}® {{CATEGORY}}',
+        additionalDisclaimers: {
+          'Tennessee Whiskey': 'Amerikanischer Whiskey. 40% Vol.',
+          'Bourbon': 'Amerikanischer Whiskey. 40% Vol.',
+          'Tequila': 'Tequila. 40% Vol. Produkt aus Mexiko.',
+          'Rum': 'Karibischer Rum. 40% Vol.',
+          'Gin': 'Gin. 40% Vol.',
+          'Ready to Drink': 'Alkoholisches Getränk. Gekühlt servieren.'
+        },
+        copyrightNotice: '© {{YEAR}} Brown-Forman Corporation'
+      },
+      
+      // French Compliance Rules
+      'FR': {
+        responsibilityMessage: 'À consommer avec modération.',
+        ageGating: 'Réservé aux plus de 18 ans.',
+        trademarkFormat: '{{BRAND}}® {{CATEGORY}}',
+        additionalDisclaimers: {
+          'Tennessee Whiskey': 'Whiskey américain. 40% Vol.',
+          'Bourbon': 'Whiskey américain. 40% Vol.',
+          'Tequila': 'Tequila. 40% Vol. Produit du Mexique.',
+          'Rum': 'Rhum des Caraïbes. 40% Vol.',
+          'Gin': 'Gin. 40% Vol.',
+          'Ready to Drink': 'Boisson alcoolisée prête à boire.'
+        },
+        copyrightNotice: '© {{YEAR}} Brown-Forman Corporation'
+      },
+
+      // Default/International Rules
+      'DEFAULT': {
+        responsibilityMessage: 'Please drink responsibly.',
+        ageGating: 'Must be of legal drinking age to view this content.',
+        trademarkFormat: '{{BRAND}}® {{CATEGORY}}',
+        additionalDisclaimers: {
+          'Tennessee Whiskey': 'American Whiskey. 40% Alc/Vol.',
+          'Bourbon': 'American Whiskey. 40% Alc/Vol.',
+          'Tequila': 'Tequila. 40% Alc/Vol. Product of Mexico.',
+          'Rum': 'Caribbean Rum. 40% Alc/Vol.',
+          'Gin': 'Gin. 40% Alc/Vol.',
+          'Ready to Drink': 'Ready-to-drink alcoholic beverage.'
+        },
+        copyrightNotice: '© {{YEAR}} Brown-Forman Corporation'
+      }
+    };
+  }
+
+  /**
+   * Generate legal copy based on parameters
+   */
   async generateCopy(params) {
     try {
-      console.log('TemplateService: Starting copy generation...', params);
+      console.log('TemplateService: Generating copy with params:', params);
 
-      // 1. Validate input parameters
-      const validation = this.validationService.validateGenerationParams(params);
+      // Validate parameters
+      const validation = validationService.validateGenerationParams(params);
       if (!validation.isValid) {
         throw new Error(`Validation failed: ${validation.errors.join(', ')}`);
       }
 
-      // 2. Ensure Excel data is loaded
-      if (!this.excelService.isDataLoaded()) {
-        await this.excelService.loadData();
+      const { assetType, countryCode, brandIds } = params;
+
+      // Get template for asset type
+      const template = this.templates[assetType];
+      if (!template) {
+        throw new Error(`No template found for asset type: ${assetType}`);
       }
 
-      // 3. Get template structure for asset type
-      const templateStructure = this.excelService.getTemplateStructureByAssetType(params.assetType);
-      if (!templateStructure) {
-        throw new Error(`No template structure found for asset type: ${params.assetType}`);
+      // Get compliance rules for country
+      const complianceRules = this.complianceRules[countryCode] || this.complianceRules['DEFAULT'];
+
+      // Get brand information
+      const brands = brandIds.map(id => excelService.getBrandById(id)).filter(Boolean);
+      if (brands.length === 0) {
+        throw new Error('No valid brands found');
       }
 
-      // 4. Get language variables for country
-      const languageVars = this.excelService.getLanguageVariablesByCountry(params.countryCode);
-      if (!languageVars) {
-        throw new Error(`No language variables found for country: ${params.countryCode}`);
+      // Get country information
+      const country = excelService.getCountryById(countryCode);
+      if (!country) {
+        throw new Error(`Country not found: ${countryCode}`);
       }
 
-      // 5. Get trademark language
-      const trademarkLang = this.excelService.getTrademarkLanguageByCountry(
-        params.countryCode, 
-        templateStructure.Type
-      );
-
-      // 6. Process each selected brand
-      const generatedCopies = [];
-      
-      for (const brandId of params.brandIds) {
-        const brand = this.excelService.getBrandById(brandId);
-        if (!brand) {
-          console.warn(`Brand not found: ${brandId}`);
-          continue;
-        }
-
-        const copy = await this.generateSingleBrandCopy({
-          brand,
-          templateStructure,
-          languageVars,
-          trademarkLang,
-          params
-        });
-
-        generatedCopies.push(copy);
-      }
-
-      // 7. Create result object
-      const result = {
-        success: true,
-        copies: generatedCopies,
-        metadata: {
-          assetType: params.assetType,
-          country: params.countryCode,
-          brandsCount: params.brandIds.length,
-          generatedAt: new Date().toISOString(),
-          templateType: templateStructure.Type
-        }
-      };
-
-      // 8. Add to history
-      this.addToHistory(result);
-
-      console.log('TemplateService: Copy generation completed successfully');
-      return result;
-
-    } catch (error) {
-      console.error('TemplateService: Copy generation failed:', error);
-      return {
-        success: false,
-        error: error.message,
-        copies: []
-      };
-    }
-  }
-
-  async generateSingleBrandCopy({ brand, templateStructure, languageVars, trademarkLang, params }) {
-    try {
-      // Create variable substitution map
-      const variables = this.buildVariableMap({
-        brand,
-        languageVars,
-        trademarkLang,
-        params
+      // Generate content sections
+      const contentSections = this.generateContentSections({
+        template,
+        complianceRules,
+        brands,
+        country,
+        assetType
       });
 
-      // Process template with variables
-      const htmlCopy = this.processTemplate(templateStructure.Template, variables, 'html');
-      const plainTextCopy = this.processTemplate(templateStructure.Template, variables, 'text');
+      // Replace placeholders in template
+      let generatedHtml = template.template;
+      let generatedPlainText = template.template;
 
-      // Apply character limit if specified
-      const finalHtmlCopy = this.applyCharacterLimit(htmlCopy, templateStructure.CharacterLimit);
-      const finalTextCopy = this.applyCharacterLimit(plainTextCopy, templateStructure.CharacterLimit);
+      Object.entries(contentSections).forEach(([placeholder, content]) => {
+        const placeholderPattern = new RegExp(`{{${placeholder}}}`, 'g');
+        generatedHtml = generatedHtml.replace(placeholderPattern, content.html || content);
+        generatedPlainText = generatedPlainText.replace(placeholderPattern, content.text || content);
+      });
 
-      return {
-        brandId: brand.id,
-        brandName: brand.name,
-        html: this.validationService.sanitizeHtml(finalHtmlCopy),
-        text: finalTextCopy,
-        characterCount: finalTextCopy.length,
-        characterLimit: templateStructure.CharacterLimit,
-        variables: variables
+      // Clean up any remaining empty placeholders
+      generatedHtml = generatedHtml.replace(/{{\w+}}/g, '').replace(/\n\n\n+/g, '\n\n').trim();
+      generatedPlainText = generatedPlainText.replace(/{{\w+}}/g, '').replace(/\n\n\n+/g, '\n\n').trim();
+
+      const result = {
+        html: generatedHtml,
+        plainText: generatedPlainText,
+        metadata: {
+          assetType,
+          country: country.name,
+          brands: brands.map(b => b.displayName),
+          generatedAt: new Date().toISOString(),
+          template: template.structure,
+          length: generatedPlainText.length,
+          maxLength: template.maxLength
+        }
       };
+
+      console.log('TemplateService: Copy generated successfully');
+      return { success: true, result };
 
     } catch (error) {
-      console.error(`Error generating copy for brand ${brand.id}:`, error);
-      return {
-        brandId: brand.id,
-        brandName: brand.name,
-        html: '',
-        text: '',
-        error: error.message
-      };
+      console.error('TemplateService: Error generating copy:', error);
+      return { success: false, error: error.message };
     }
   }
 
-  buildVariableMap({ brand, languageVars, trademarkLang, params }) {
-    const country = this.excelService.getCountryById(params.countryCode);
-    
-    return {
-      // Brand variables
-      BRAND_NAME: brand.name,
-      BRAND_ENTITY: brand.entity,
-      
-      // Trademark variables
-      TRADEMARK: trademarkLang?.RegisteredLanguage || '®',
-      RESERVE_TRADEMARK: trademarkLang?.ReserveLanguage || '™',
-      
-      // Compliance variables
-      COMPLIANCE_TEXT: languageVars?.ResponsibilityLanguage || 'Please drink responsibly.',
-      FORWARD_NOTICE: languageVars?.ForwardNotice || '',
-      
-      // Country variables
-      COUNTRY: country?.name || params.countryCode,
-      COUNTRY_CODE: params.countryCode,
-      LANGUAGE: country?.language || 'English',
-      
-      // Asset type
-      ASSET_TYPE: params.assetType,
-      
-      // Date variables
-      CURRENT_YEAR: new Date().getFullYear(),
-      CURRENT_DATE: new Date().toLocaleDateString(),
-      
-      // Custom variables (if provided)
-      ...(params.customVariables || {})
-    };
-  }
+  /**
+   * Generate individual content sections
+   */
+  generateContentSections({ template, complianceRules, brands, country, assetType }) {
+    const currentYear = new Date().getFullYear();
+    const sections = {};
 
-  processTemplate(template, variables, format = 'html') {
-    if (!template || typeof template !== 'string') {
-      return '';
+    // Content intro
+    sections.CONTENT_INTRO = this.generateContentIntro(brands, assetType);
+
+    // Brand mentions with proper formatting
+    sections.BRAND_MENTIONS = this.generateBrandMentions(brands, complianceRules);
+
+    // Trademark notices
+    sections.TRADEMARK_NOTICES = this.generateTrademarkNotices(brands, complianceRules);
+
+    // Responsibility messages
+    sections.RESPONSIBILITY_MESSAGE = complianceRules.responsibilityMessage;
+    sections.RESPONSIBILITY_MESSAGE_SHORT = this.shortenMessage(complianceRules.responsibilityMessage);
+    sections.RESPONSIBILITY_MESSAGE_MICRO = 'Drink responsibly.';
+
+    // Additional disclaimers based on brand categories
+    sections.ADDITIONAL_DISCLAIMERS = this.generateAdditionalDisclaimers(brands, complianceRules);
+
+    // Copyright notice
+    sections.COPYRIGHT_NOTICE = complianceRules.copyrightNotice.replace('{{YEAR}}', currentYear);
+
+    // Asset-specific sections
+    if (assetType === 'Instagram Post') {
+      sections.HASHTAGS = this.generateHashtags(brands);
     }
 
-    let processedTemplate = template;
+    if (assetType === 'LinkedIn Post') {
+      sections.CORPORATE_MESSAGE = this.generateCorporateMessage(brands);
+      sections.CORPORATE_DISCLAIMER = 'Brown-Forman Corporation is committed to responsible marketing and consumption of our premium spirits brands.';
+    }
 
-    // Replace all variables in the format {VARIABLE_NAME}
-    Object.entries(variables).forEach(([key, value]) => {
-      const placeholder = `{${key}}`;
-      const regex = new RegExp(placeholder.replace(/[{}]/g, '\\$&'), 'g');
-      processedTemplate = processedTemplate.replace(regex, value || '');
+    if (assetType === 'Email Template') {
+      sections.EMAIL_HEADER = 'Brown-Forman Premium Spirits';
+      sections.UNSUBSCRIBE_NOTICE = 'To unsubscribe from future communications, please click here.';
+    }
+
+    if (assetType === 'Video Description') {
+      sections.CONTENT_WARNING = 'This content is intended for adults of legal drinking age only.';
+    }
+
+    if (assetType === 'Website Copy') {
+      sections.PRIVACY_POLICY_LINK = '<a href="/privacy-policy">Privacy Policy</a>';
+      sections.TERMS_CONDITIONS_LINK = '<a href="/terms-conditions">Terms & Conditions</a>';
+    }
+
+    return sections;
+  }
+
+  generateContentIntro(brands, assetType) {
+    const brandNames = brands.map(b => b.displayName);
+    const brandCount = brandNames.length;
+
+    if (brandCount === 1) {
+      return `Discover the exceptional quality of ${brandNames[0]}.`;
+    } else {
+      return `Experience the premium portfolio of ${brandNames.slice(0, -1).join(', ')} and ${brandNames.slice(-1)[0]}.`;
+    }
+  }
+
+  generateBrandMentions(brands, complianceRules) {
+    return brands.map(brand => {
+      const trademark = complianceRules.trademarkFormat
+        .replace('{{BRAND}}', brand.displayName)
+        .replace('{{CATEGORY}}', brand.category);
+      
+      return `<strong>${trademark}</strong>`;
+    }).join(' • ');
+  }
+
+  generateTrademarkNotices(brands, complianceRules) {
+    const notices = brands.map(brand => {
+      return `${brand.displayName}® is a registered trademark of ${brand.entityName}.`;
     });
 
-    // Format-specific processing
-    if (format === 'html') {
-      // Convert line breaks to HTML
-      processedTemplate = processedTemplate.replace(/\n/g, '<br>');
-      
-      // Add HTML structure if needed
-      if (!processedTemplate.includes('<')) {
-        processedTemplate = `<p>${processedTemplate}</p>`;
+    return notices.join(' ');
+  }
+
+  generateAdditionalDisclaimers(brands, complianceRules) {
+    const disclaimers = brands.map(brand => {
+      const categoryDisclaimer = complianceRules.additionalDisclaimers[brand.category];
+      if (categoryDisclaimer) {
+        return `${brand.displayName}: ${categoryDisclaimer}`;
       }
-    } else if (format === 'text') {
-      // Strip any HTML tags for plain text
-      processedTemplate = processedTemplate.replace(/<[^>]*>/g, '');
-      processedTemplate = processedTemplate.replace(/<br\s*\/?>/gi, '\n');
-    }
+      return null;
+    }).filter(Boolean);
 
-    return processedTemplate.trim();
+    return disclaimers.length > 0 ? disclaimers.join(' ') : '';
   }
 
-  applyCharacterLimit(text, limit) {
-    if (!limit || typeof limit !== 'number' || text.length <= limit) {
-      return text;
-    }
-
-    // Truncate but try to preserve word boundaries
-    const truncated = text.substring(0, limit);
-    const lastSpaceIndex = truncated.lastIndexOf(' ');
-    
-    if (lastSpaceIndex > limit * 0.8) {
-      return truncated.substring(0, lastSpaceIndex) + '...';
-    }
-    
-    return truncated + '...';
-  }
-
-  addToHistory(result) {
-    this.generationHistory.unshift({
-      id: Date.now(),
-      timestamp: new Date().toISOString(),
-      ...result
+  generateHashtags(brands) {
+    const hashtags = brands.flatMap(brand => {
+      const brandTag = '#' + brand.displayName.replace(/[^a-zA-Z0-9]/g, '');
+      const categoryTag = '#' + brand.category.replace(/[^a-zA-Z0-9]/g, '');
+      return [brandTag, categoryTag];
     });
 
-    // Keep only last 100 generations
-    if (this.generationHistory.length > 100) {
-      this.generationHistory = this.generationHistory.slice(0, 100);
-    }
+    // Add common hashtags
+    hashtags.push('#BrownForman', '#PremiumSpirits', '#DrinkResponsibly');
+    
+    return hashtags.slice(0, 10).join(' '); // Limit to 10 hashtags
   }
 
-  getHistory() {
-    return this.generationHistory;
+  generateCorporateMessage(brands) {
+    return `Brown-Forman is proud to craft and share these exceptional spirits brands that bring people together and create memorable experiences.`;
   }
 
-  clearHistory() {
-    this.generationHistory = [];
-  }
-
-  getHistoryById(id) {
-    return this.generationHistory.find(item => item.id === id) || null;
-  }
-
-  exportHistory() {
-    return {
-      exported: new Date().toISOString(),
-      count: this.generationHistory.length,
-      history: this.generationHistory
+  shortenMessage(message) {
+    if (message.length <= 50) return message;
+    
+    // Common shortenings for different languages
+    const shortenings = {
+      'Please drink responsibly.': 'Drink responsibly.',
+      'À consommer avec modération.': 'Avec modération.',
+      'Bitte trinken Sie verantwortungsvoll.': 'Verantwortungsvoll trinken.',
+      'Please drink responsibly. For more information visit drinkaware.co.uk': 'Drink responsibly. drinkaware.co.uk'
     };
+
+    return shortenings[message] || message.split('.')[0] + '.';
   }
 
-  // Utility methods
-  getAvailableVariables() {
-    return [
-      'BRAND_NAME', 'BRAND_ENTITY', 'TRADEMARK', 'RESERVE_TRADEMARK',
-      'COMPLIANCE_TEXT', 'FORWARD_NOTICE', 'COUNTRY', 'COUNTRY_CODE',
-      'LANGUAGE', 'ASSET_TYPE', 'CURRENT_YEAR', 'CURRENT_DATE'
-    ];
+  /**
+   * Get available templates
+   */
+  getAvailableTemplates() {
+    return Object.keys(this.templates).map(assetType => ({
+      assetType,
+      structure: this.templates[assetType].structure,
+      maxLength: this.templates[assetType].maxLength,
+      requirements: this.templates[assetType].requirements
+    }));
   }
 
-  validateTemplate(template) {
-    const errors = [];
-    const availableVars = this.getAvailableVariables();
-    
-    // Find all placeholders in template
-    const placeholders = template.match(/{[^}]+}/g) || [];
-    
-    placeholders.forEach(placeholder => {
-      const varName = placeholder.replace(/[{}]/g, '');
-      if (!availableVars.includes(varName)) {
-        errors.push(`Unknown variable: ${varName}`);
-      }
-    });
+  /**
+   * Get compliance rules for a country
+   */
+  getComplianceRules(countryCode) {
+    return this.complianceRules[countryCode] || this.complianceRules['DEFAULT'];
+  }
+
+  /**
+   * Preview template structure
+   */
+  previewTemplate(assetType) {
+    const template = this.templates[assetType];
+    if (!template) {
+      return { error: 'Template not found' };
+    }
 
     return {
-      isValid: errors.length === 0,
-      errors,
-      placeholders: placeholders.length
+      structure: template.structure,
+      template: template.template,
+      requirements: template.requirements,
+      maxLength: template.maxLength
     };
   }
 }

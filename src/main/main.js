@@ -24,48 +24,6 @@ if (isDev) {
 function createMenu() {
   const template = [
     {
-      label: 'File',
-      submenu: [
-        {
-          label: 'Reload Data',
-          accelerator: 'CmdOrCtrl+R',
-          click: () => {
-            if (mainWindow) {
-              mainWindow.webContents.send('reload-excel-data');
-            }
-          }
-        },
-        { type: 'separator' },
-        { role: 'quit' }
-      ]
-    },
-    {
-      label: 'Edit',
-      submenu: [
-        { role: 'undo' },
-        { role: 'redo' },
-        { type: 'separator' },
-        { role: 'cut' },
-        { role: 'copy' },
-        { role: 'paste' },
-        { role: 'selectall' }
-      ]
-    },
-    {
-      label: 'View',
-      submenu: [
-        { role: 'reload' },
-        { role: 'forcereload' },
-        { role: 'toggledevtools' },
-        { type: 'separator' },
-        { role: 'resetzoom' },
-        { role: 'zoomin' },
-        { role: 'zoomout' },
-        { type: 'separator' },
-        { role: 'togglefullscreen' }
-      ]
-    },
-    {
       label: 'Help',
       submenu: [
         {
@@ -83,13 +41,20 @@ function createMenu() {
     }
   ];
 
-  // Add Mac-specific menu adjustments
+  // Add Quit option differently based on platform
   if (isMac) {
     template.unshift({
       label: app.getName(),
       submenu: [
         { role: 'about' },
         { type: 'separator' },
+        { role: 'quit' }
+      ]
+    });
+  } else {
+    template.unshift({
+      label: 'File',
+      submenu: [
         { role: 'quit' }
       ]
     });

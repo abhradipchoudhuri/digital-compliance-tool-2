@@ -13,14 +13,28 @@ module.exports = {
   output: {
     path: path.resolve(__dirname, '../dist'),
     filename: 'renderer.js',
-    publicPath: isDevelopment ? 'http://localhost:3000/' : './',
+    publicPath: isDevelopment ? '/' : './',  // Fixed: Remove http://localhost:3000
+    clean: true, // Clean output directory before each build
   },
   
   devServer: {
     port: 3000,
+    host: 'localhost', // Explicitly set host
     hot: true,
+    open: false, // Don't auto-open browser
+    historyApiFallback: true, // CRITICAL: Serve index.html for all routes
     static: {
-      directory: path.join(__dirname, '../dist'),
+      directory: path.resolve(__dirname, '../dist'),
+      publicPath: '/',
+    },
+    allowedHosts: 'all', // Allow connections from Electron
+    headers: {
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, PATCH, OPTIONS',
+      'Access-Control-Allow-Headers': 'X-Requested-With, content-type, Authorization',
+    },
+    client: {
+      webSocketURL: 'ws://localhost:3000/ws', // Explicit WebSocket URL
     },
   },
   
@@ -60,16 +74,20 @@ module.exports = {
     new HtmlWebpackPlugin({
       template: path.resolve(__dirname, '../src/renderer/index.html'),
       filename: 'index.html',
+      inject: 'body', // Inject scripts at end of body
+      minify: false, // Don't minify in development
     }),
     new CopyWebpackPlugin({
       patterns: [
         {
           from: path.resolve(__dirname, '../data'),
           to: path.resolve(__dirname, '../dist/data'),
+          noErrorOnMissing: true, // Don't fail if directory doesn't exist
         },
         {
           from: path.resolve(__dirname, '../assets'),
           to: path.resolve(__dirname, '../dist/assets'),
+          noErrorOnMissing: true, // Don't fail if directory doesn't exist
         },
       ],
     }),
@@ -87,4 +105,12 @@ module.exports = {
   },
   
   devtool: isDevelopment ? 'eval-source-map' : 'source-map',
+  
+  // Performance hints
+  performance: {
+    hints: false, // Disable performance warnings in development
+  },
+  
+  // Stats configuration for cleaner output
+  stats: isDevelopment ? 'minimal' : 'normal',
 };

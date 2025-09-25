@@ -33,6 +33,7 @@ export class ExcelService {
 
       console.log('✅ ExcelService: Excel data loaded successfully!');
       console.log('📊 Available sheets:', Object.keys(this.data));
+      console.log('🔍 FIRST BRAND ROW:', this.data['Trademark Config'][1]); // Row 1 (row 0 is headers)
       console.log('📈 Sheet summary:');
       Object.keys(this.data).forEach(sheetName => {
         const rowCount = this.data[sheetName].length;

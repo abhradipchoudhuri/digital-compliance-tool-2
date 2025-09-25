@@ -18,71 +18,34 @@ const App = () => {
   const [generatedCopy, setGeneratedCopy] = useState(null);
   const [isGenerating, setIsGenerating] = useState(false);
   
-  // Mock data - will be replaced by real Excel data
-  const assetTypes = [
-    'Facebook Post', 
-    'Instagram Story',
-    'Twitter Post',
-    'LinkedIn Post',
-    'Email Template',
-    'Banner Ad',
-    'Video Description',
-    'Website Copy'
-  ];
+  // Get data from Excel context
+  const brandsData = excelContext.getBrands() || [];
+  const countriesData = excelContext.getCountries() || [];
+  const assetTypesData = excelContext.getAssetTypes() || [];
 
-  const countries = [
-    { code: 'US', name: 'United States' },
-    { code: 'UK', name: 'United Kingdom' },
-    { code: 'DE', name: 'Germany' },
-    { code: 'FR', name: 'France' },
-    { code: 'JP', name: 'Japan' },
-    { code: 'AU', name: 'Australia' },
-    { code: 'CA', name: 'Canada' },
-    { code: 'MX', name: 'Mexico' },
-    { code: 'BR', name: 'Brazil' }
-  ];
+  // Convert Excel data to UI format
+  const assetTypes = assetTypesData.map(item => 
+    typeof item === 'string' ? item : item.name
+  );
 
-  // Brown-Forman brands from screenshot
-  const brands = [
-    { id: 'amigos-herradura', name: 'Amigos de Herradura', category: 'Tequila' },
-    { id: 'bf-portfolio', name: 'B-F Portfolio (multi-brand)', category: 'Portfolio' },
-    { id: 'botucal', name: 'Botucal', category: 'Rum' },
-    { id: 'chambord', name: 'Chambord', category: 'Liqueur' },
-    { id: 'cheers-host', name: 'Cheers to the Host (multi-brand)', category: 'Portfolio' },
-    { id: 'coopers-craft', name: 'Cooper\'s Craft', category: 'Bourbon' },
-    { id: 'diplomatico', name: 'Diplomático', category: 'Rum' },
-    { id: 'el-jimador-new', name: 'el Jimador New Mix', category: 'Tequila' },
-    { id: 'fords-gin', name: 'Ford\'s Gin', category: 'Gin' },
-    { id: 'gentleman-jack', name: 'Gentleman Jack', category: 'Whiskey' },
-    { id: 'gentleman-whiskey', name: 'Gentleman Jack Whiskey Sour (RTD)', category: 'RTD' },
-    { id: 'gin-mare', name: 'Gin Mare', category: 'Gin' },
-    { id: 'glenglassaugh', name: 'Glenglassaugh', category: 'Scotch' },
-    { id: 'herradura-tequila', name: 'Herradura Tequila', category: 'Tequila' },
-    { id: 'jack-apple-fizz', name: 'Jack Apple Fizz (RTD)', category: 'RTD' },
-    { id: 'jack-cola-ginger', name: 'Jack & Cola / Ginger / Berry (RTD)', category: 'RTD' },
-    { id: 'jack-apple-tonic', name: 'Jack Apple & Tonic (RTD)', category: 'RTD' },
-    { id: 'jack-daniels-bonded', name: 'Jack Daniel\'s Bonded Series', category: 'Whiskey' },
-    { id: 'jack-daniels-bottled', name: 'Jack Daniel\'s Bottled in Bond', category: 'Whiskey' },
-    { id: 'jack-daniels-country', name: 'Jack Daniel\'s Country Cocktails', category: 'RTD' },
-    { id: 'jack-daniels-fob', name: 'Jack Daniel\'s FOB (multi-brand)', category: 'Portfolio' },
-    { id: 'jack-daniels-lynchburg', name: 'Jack Daniel\'s Lynchburg Lemonade (RTD)', category: 'RTD' },
-    { id: 'jack-daniels-27', name: 'Jack Daniel\'s No. 27 Gold', category: 'Whiskey' },
-    { id: 'jack-daniels-old-7', name: 'Jack Daniel\'s Old No 7', category: 'Whiskey' },
-    { id: 'jack-daniels-sinatra', name: 'Jack Daniel\'s Sinatra Select', category: 'Whiskey' },
-    { id: 'jack-daniels-single-barrel', name: 'Jack Daniel\'s Single Barrel Series', category: 'Whiskey' },
-    { id: 'jack-daniels-tennessee-apple', name: 'Jack Daniel\'s Tennessee Apple', category: 'Flavored Whiskey' },
-    { id: 'jack-daniels-tennessee-fire', name: 'Jack Daniel\'s Tennessee Fire', category: 'Flavored Whiskey' },
-    { id: 'jack-daniels-tennessee-honey', name: 'Jack Daniel\'s Tennessee Honey', category: 'Flavored Whiskey' },
-    { id: 'jack-daniels-tennessee-rye', name: 'Jack Daniel\'s Tennessee Rye', category: 'Whiskey' },
-    { id: 'jack-daniels-triple-mash', name: 'Jack Daniel\'s Triple Mash', category: 'Whiskey' },
-    { id: 'jack-daniels-winter-jack', name: 'Jack Daniel\'s Winter Jack', category: 'Flavored Whiskey' },
-    { id: 'jack-honey-lemonade', name: 'Jack Honey & Lemonade (RTD)', category: 'RTD' },
-    { id: 'master-craft-academy', name: 'Master Craft Academy (multi-brand)', category: 'Portfolio' },
-    { id: 'old-forester', name: 'Old Forester', category: 'Bourbon' },
-    { id: 'slane-irish-whiskey', name: 'Slane Irish Whiskey', category: 'Irish Whiskey' },
-    { id: 'the-glendronnach', name: 'The GlenDronach', category: 'Scotch' },
-    { id: 'woodford-reserve', name: 'Woodford Reserve', category: 'Bourbon' }
-  ];
+  const countries = countriesData.map(item => {
+    if (typeof item === 'string') {
+      return { code: item.substring(0, 2).toUpperCase(), name: item };
+    }
+    return { 
+      code: item.code || item.name.substring(0, 2).toUpperCase(), 
+      name: item.name 
+    };
+  });
+
+  const brands = brandsData.map((item, index) => {
+    const name = typeof item === 'string' ? item : item.name;
+    return {
+      id: name.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
+      name: name,
+      category: typeof item === 'object' && item.category ? item.category : 'Brand'
+    };
+  });
 
   const filteredBrands = searchQuery
     ? brands.filter(brand => 

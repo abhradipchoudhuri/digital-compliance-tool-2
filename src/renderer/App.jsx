@@ -16,9 +16,14 @@ const App = () => {
   const [isGenerating, setIsGenerating] = useState(false);
   
   // Get data from Excel context - NOT hardcoded
-  const brands = excelContext.getBrands() || [];
-  const countries = excelContext.getCountries() || [];
-  const assetTypes = excelContext.getAssetTypes() || [];
+  const brandsData = excelContext.getBrands() || [];
+  const countriesData = excelContext.getCountries() || [];
+  const assetTypesData = excelContext.getAssetTypes() || [];
+
+  // Extract names from objects (handle both string arrays and object arrays)
+  const brands = brandsData.map(item => typeof item === 'string' ? item : item.name);
+  const countries = countriesData.map(item => typeof item === 'string' ? item : item.name);
+  const assetTypes = assetTypesData.map(item => typeof item === 'string' ? item : item.name);
 
   const filteredBrands = searchQuery
     ? brands.filter(brand => brand.toLowerCase().includes(searchQuery.toLowerCase()))

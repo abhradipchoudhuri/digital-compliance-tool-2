@@ -10,7 +10,6 @@ try {
   Logger = require('./utils/logger').Logger;
 } catch (e) {
   console.warn('Services not found, using mock implementations');
-  // Mock implementations
   ExcelService = class {
     async loadData() {
       return { 
@@ -45,28 +44,32 @@ const ExcelDataProvider = ({ children, data }) => {
     rawData: data,
     getBrands: () => {
       const config = data['Trademark Config'] || [];
-      return config.filter(row => row.Type === 'Brand').map(row => ({
-        id: row.ID,
-        name: row.Name,
-        entity: row.Entity
-      }));
+      return config
+        .filter(row => row['Trademark Type'] === 'Brand')
+        .map(row => ({
+          id: row['Brand Names']?.toLowerCase().replace(/[^a-z0-9]/g, '-') || '',
+          name: row['Brand Names'] || '',
+          entity: row['Entity Names'] || ''
+        }));
     },
     getCountries: () => {
       const countryLang = data['CountryLanguage'] || [];
-      const unique = [...new Map(countryLang.map(r => [r.CountryCode, r])).values()];
+      const unique = [...new Map(countryLang.map(r => [r['Abbv'], r])).values()];
       return unique.map(row => ({
-        code: row.CountryCode,
-        name: row.CountryName,
-        language: row.Language
+        code: row['Abbv'] || '',
+        name: row['Country'] || '',
+        language: row['Language'] || ''
       }));
     },
     getAssetTypes: () => {
       const config = data['Trademark Config'] || [];
-      return config.filter(row => row.Type === 'Asset Type').map(row => ({
-        id: row.ID,
-        name: row.Name,
-        description: row.Description
-      }));
+      return config
+        .filter(row => row['Trademark Type'] === 'Asset Type')
+        .map(row => ({
+          id: row['Brand Names']?.toLowerCase().replace(/[^a-z0-9]/g, '-') || '',
+          name: row['Brand Names'] || '',
+          description: row['Asset Type Instructions'] || ''
+        }));
     }
   };
 
@@ -94,7 +97,6 @@ class AppWrapper extends React.Component {
     try {
       logger.info('Initializing Digital Compliance Tool...');
       
-      // Detect environment
       const isElectron = !!window.electronAPI;
       const mode = isElectron ? 'electron' : 'browser';
       
@@ -102,7 +104,6 @@ class AppWrapper extends React.Component {
       
       this.setState({ mode });
       
-      // Try to load Excel data (will work in Electron, may fail in browser)
       await this.loadExcelData();
       
     } catch (error) {
@@ -130,7 +131,6 @@ class AppWrapper extends React.Component {
           error: null
         });
       } else {
-        // Excel loading failed, but continue with mock data
         logger.warn('⚠️ Excel data not available:', result.error);
         
         this.setState({
@@ -151,17 +151,16 @@ class AppWrapper extends React.Component {
   }
 
   getMockData() {
-    // Minimal mock data structure for testing
     return {
       'Trademark Config': [
-        { Type: 'Brand', ID: 'chambord', Name: 'Chambord', Entity: 'Brown-Forman' },
-        { Type: 'Brand', ID: 'jd', Name: 'Jack Daniel\'s', Entity: 'Brown-Forman' },
-        { Type: 'Asset Type', ID: 'website', Name: 'Website Copy', Description: 'Web content' },
-        { Type: 'Asset Type', ID: 'social', Name: 'Social Media', Description: 'Social posts' }
+        { 'Trademark Type': 'Brand', 'Brand Names': 'Chambord', 'Entity Names': 'Brown-Forman' },
+        { 'Trademark Type': 'Brand', 'Brand Names': 'Jack Daniel\'s', 'Entity Names': 'Brown-Forman' },
+        { 'Trademark Type': 'Asset Type', 'Brand Names': 'Website Copy', 'Asset Type Instructions': 'Web content' },
+        { 'Trademark Type': 'Asset Type', 'Brand Names': 'Social Media', 'Asset Type Instructions': 'Social posts' }
       ],
       'CountryLanguage': [
-        { CountryCode: 'US', CountryName: 'United States', Language: 'English' },
-        { CountryCode: 'GB', CountryName: 'United Kingdom', Language: 'English' }
+        { 'Abbv': 'US', 'Country': 'United States', 'Language': 'English' },
+        { 'Abbv': 'GB', 'Country': 'United Kingdom', 'Language': 'English' }
       ],
       'Trademark Language': [],
       'Trademark Structure': [],
@@ -174,7 +173,6 @@ class AppWrapper extends React.Component {
   render() {
     const { isLoading, error, excelData, mode } = this.state;
 
-    // Loading screen
     if (isLoading) {
       return (
         <div className="min-h-screen bg-blue-900 flex items-center justify-center">
@@ -191,10 +189,8 @@ class AppWrapper extends React.Component {
       );
     }
 
-    // Render app with data (even if using mock data)
     return (
       <div>
-        {/* Dev mode banner */}
         {error && (
           <div className="bg-yellow-500 text-yellow-900 px-4 py-2 text-sm">
             ⚠️ {mode === 'browser' ? 'Browser Dev Mode' : 'Demo Mode'}: {error}

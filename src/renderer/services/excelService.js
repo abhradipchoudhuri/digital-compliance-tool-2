@@ -1,5 +1,5 @@
 // src/renderer/services/excelService.js
-// Excel Service - Loads and processes real Excel data from Electron main process
+// Excel Service - FIXED to match your actual Excel column names
 
 export class ExcelService {
   constructor() {
@@ -12,19 +12,16 @@ export class ExcelService {
     try {
       console.log('ExcelService: Starting Excel data load...');
       
-      // Check if Electron API is available
       if (!window.electronAPI) {
-        throw new Error('Electron API not available - running outside Electron environment');
+        throw new Error('Electron API not available');
       }
 
-      // Call IPC handler to load Excel data
       const result = await window.electronAPI.loadExcelData();
       
       if (!result.success) {
         throw new Error(result.error || 'Failed to load Excel data');
       }
 
-      // Store the parsed data (already in object format from main.js)
       this.data = result.data;
       this.metadata = {
         filePath: result.filePath,
@@ -34,7 +31,6 @@ export class ExcelService {
       };
       this.isLoaded = true;
 
-      // Log successful load
       console.log('✅ ExcelService: Excel data loaded successfully!');
       console.log('📊 Available sheets:', Object.keys(this.data));
       console.log('📈 Sheet summary:');
@@ -54,8 +50,6 @@ export class ExcelService {
 
     } catch (error) {
       console.error('❌ ExcelService: Error loading data:', error);
-      
-      // Clear any partial data
       this.data = null;
       this.metadata = null;
       this.isLoaded = false;
@@ -67,33 +61,29 @@ export class ExcelService {
     }
   }
 
-  // Check if data is loaded
   isDataLoaded() {
     return this.isLoaded && this.data !== null;
   }
 
-  // Get all data
   getData() {
     return this.data;
   }
 
-  // Get raw data (alias for getData)
   getRawData() {
     return this.data;
   }
 
-  // Get metadata about loaded file
   getMetadata() {
     return this.metadata;
   }
 
   // ============================================
-  // PROCESSED DATA ACCESSORS
+  // FIXED: Match YOUR actual Excel column names
   // ============================================
 
   /**
-   * Get list of brands from Trademark Config sheet
-   * Filters rows where Type === 'Brand'
+   * Get brands from Trademark Config
+   * YOUR EXCEL COLUMNS: 'Display Names', 'Brand Names', 'Entity Names', 'Trademark Type'
    */
   getBrands() {
     if (!this.data || !this.data['Trademark Config']) {
@@ -102,45 +92,66 @@ export class ExcelService {
     }
     
     const brands = this.data['Trademark Config']
-      .filter(row => row.Type === 'Brand')
+      .filter(row => {
+        // Check different possible column name variations
+        const type = row['Trademark Type'] || row.Type || row.type || '';
+        return type.toLowerCase().includes('brand') || row['Brand Names'] || row['Display Names'];
+      })
       .map(row => ({
-        id: row.ID || row.Id || '',
-        name: row.Name || '',
-        entity: row.Entity || '',
-        category: row.Category || 'Spirits',
-        instructions: row.Instructions || ''
-      }));
+        id: (row['Brand Names'] || row['Display Names'] || row.ID || '').toString().toLowerCase().replace(/[^a-z0-9]/g, '-'),
+        name: row['Display Names'] || row['Brand Names'] || row.Name || '',
+        entity: row['Entity Names'] || row.Entity || '',
+        brandNames: row['Brand Names'] || '',
+        displayNames: row['Display Names'] || ''
+      }))
+      .filter(brand => brand.name); // Only include rows with names
     
     console.log(`📋 getBrands(): Found ${brands.length} brands`);
     return brands;
   }
 
   /**
-   * Get list of asset types from Trademark Config sheet
-   * Filters rows where Type === 'Asset Type'
+   * Get asset types from Trademark Config
+   * YOUR EXCEL: Check 'Asset Type Instructions' column or 'Trademark Type'
    */
   getAssetTypes() {
-    if (!this.data || !this.data['Trademark Config']) {
-      console.warn('⚠️ Trademark Config sheet not found');
+    if (!this.data || !this.data['Overall Structure']) {
+      console.warn('⚠️ Overall Structure sheet not found, trying Trademark Config...');
+      
+      // Fallback: try to get from Trademark Config if Overall Structure missing
+      if (this.data && this.data['Trademark Config']) {
+        const assetTypes = this.data['Trademark Config']
+          .filter(row => row['Asset Type Instructions'])
+          .map(row => ({
+            id: (row['Asset Type Instructions'] || '').toString().toLowerCase().replace(/[^a-z0-9]/g, '-'),
+            name: row['Asset Type Instructions'] || '',
+            description: ''
+          }))
+          .filter(type => type.name);
+        
+        console.log(`📋 getAssetTypes(): Found ${assetTypes.length} asset types from Trademark Config`);
+        return assetTypes;
+      }
+      
       return [];
     }
     
-    const assetTypes = this.data['Trademark Config']
-      .filter(row => row.Type === 'Asset Type')
+    // Get from Overall Structure sheet (YOUR EXCEL: 'Asset Type' column)
+    const assetTypes = this.data['Overall Structure']
       .map(row => ({
-        id: row.ID || row.Id || '',
-        name: row.Name || '',
-        description: row.Description || '',
-        instructions: row.Instructions || ''
-      }));
+        id: (row['Asset Type'] || row.AssetType || '').toString().toLowerCase().replace(/[^a-z0-9]/g, '-'),
+        name: row['Asset Type'] || row.AssetType || '',
+        description: row.Structure || row.Description || ''
+      }))
+      .filter(type => type.name);
     
     console.log(`📋 getAssetTypes(): Found ${assetTypes.length} asset types`);
     return assetTypes;
   }
 
   /**
-   * Get list of countries from CountryLanguage sheet
-   * Returns unique countries with their default language
+   * Get countries from CountryLanguage sheet
+   * YOUR EXCEL COLUMNS: 'Abbv', 'Country', 'Language'
    */
   getCountries() {
     if (!this.data || !this.data['CountryLanguage']) {
@@ -148,17 +159,18 @@ export class ExcelService {
       return [];
     }
     
-    // Use Map to get unique countries by country code
     const uniqueCountries = new Map();
     
     this.data['CountryLanguage'].forEach(row => {
-      const code = row.CountryCode || row['Country Code'];
+      // YOUR EXCEL has 'Abbv' for country code, 'Country' for name
+      const code = row.Abbv || row.CountryCode || row['Country Code'];
+      const name = row.Country || row.CountryName || row['Country Name'];
+      
       if (code && !uniqueCountries.has(code)) {
         uniqueCountries.set(code, {
           code: code,
-          name: row.CountryName || row['Country Name'] || code,
-          language: row.Language || 'English',
-          region: row.Region || ''
+          name: name || code,
+          language: row.Language || 'English'
         });
       }
     });
@@ -169,39 +181,43 @@ export class ExcelService {
   }
 
   /**
-   * Get all languages available for a specific country
+   * Get all languages for a country
    */
   getCountryLanguages(countryCode) {
     if (!this.data || !this.data['CountryLanguage']) return [];
     
     return this.data['CountryLanguage']
-      .filter(row => (row.CountryCode || row['Country Code']) === countryCode)
+      .filter(row => (row.Abbv || row.CountryCode) === countryCode)
       .map(row => ({
         language: row.Language || 'English',
-        countryName: row.CountryName || row['Country Name'] || countryCode
+        countryName: row.Country || row.CountryName || countryCode
       }));
   }
 
   /**
-   * Get trademark language data for specific language
+   * Get trademark language data
    */
-  getTrademarkLanguage(language) {
+  getTrademarkLanguage(language = null) {
     if (!this.data || !this.data['Trademark Language']) return [];
     
-    return this.data['Trademark Language'].filter(
-      row => row.Language === language
-    );
+    if (language) {
+      return this.data['Trademark Language'].filter(
+        row => row.Language === language
+      );
+    }
+    
+    return this.data['Trademark Language'];
   }
 
   /**
-   * Get trademark structure data
+   * Get trademark structure
    */
   getTrademarkStructure(type = null) {
     if (!this.data || !this.data['Trademark Structure']) return [];
     
     if (type) {
       return this.data['Trademark Structure'].filter(
-        row => row.Type === type
+        row => (row['Type of Trademark'] || row.Type) === type
       );
     }
     
@@ -209,7 +225,7 @@ export class ExcelService {
   }
 
   /**
-   * Get language dependent variables for a specific language
+   * Get language dependent variables
    */
   getLanguageVariables(language) {
     if (!this.data || !this.data['Language Dependent Variables']) return [];
@@ -220,14 +236,14 @@ export class ExcelService {
   }
 
   /**
-   * Get overall structure for an asset type
+   * Get overall structure
    */
   getOverallStructure(assetType = null) {
     if (!this.data || !this.data['Overall Structure']) return [];
     
     if (assetType) {
       return this.data['Overall Structure'].filter(
-        row => row['Asset Type'] === assetType || row.AssetType === assetType
+        row => (row['Asset Type'] || row.AssetType) === assetType
       );
     }
     
@@ -242,34 +258,24 @@ export class ExcelService {
       return '';
     }
     
-    // Return the help text from first row
     const helpRow = this.data['Help Text'][0];
-    return helpRow.HelpText || helpRow['Help Text'] || '';
+    return helpRow.Instructions || helpRow.HelpText || helpRow['Help Text'] || '';
   }
 
   // ============================================
   // UTILITY METHODS
   // ============================================
 
-  /**
-   * Get brand by ID
-   */
   getBrandById(id) {
     const brands = this.getBrands();
     return brands.find(brand => brand.id === id) || null;
   }
 
-  /**
-   * Get country by code
-   */
   getCountryByCode(code) {
     const countries = this.getCountries();
     return countries.find(country => country.code === code) || null;
   }
 
-  /**
-   * Get asset type by name or ID
-   */
   getAssetTypeByName(nameOrId) {
     const assetTypes = this.getAssetTypes();
     return assetTypes.find(
@@ -277,9 +283,6 @@ export class ExcelService {
     ) || null;
   }
 
-  /**
-   * Search brands by query string
-   */
   searchBrands(query) {
     const brands = this.getBrands();
     if (!query) return brands;
@@ -288,13 +291,12 @@ export class ExcelService {
     return brands.filter(brand => 
       brand.name?.toLowerCase().includes(lowerQuery) ||
       brand.entity?.toLowerCase().includes(lowerQuery) ||
-      brand.id?.toLowerCase().includes(lowerQuery)
+      brand.id?.toLowerCase().includes(lowerQuery) ||
+      brand.displayNames?.toLowerCase().includes(lowerQuery) ||
+      brand.brandNames?.toLowerCase().includes(lowerQuery)
     );
   }
 
-  /**
-   * Search countries by query string
-   */
   searchCountries(query) {
     const countries = this.getCountries();
     if (!query) return countries;
@@ -306,21 +308,17 @@ export class ExcelService {
     );
   }
 
-  /**
-   * Get template structure for generating copy
-   */
   getTemplateStructure(assetType) {
     const structure = this.getOverallStructure(assetType);
     if (structure.length === 0) return null;
-    
     return structure[0];
   }
 
   /**
-   * Get statistics about loaded data
+   * Get statistics - FIXED to always return valid object
    */
   getStats() {
-    return {
+    const stats = {
       isLoaded: this.isLoaded,
       totalSheets: this.data ? Object.keys(this.data).length : 0,
       totalBrands: this.getBrands().length,
@@ -329,11 +327,11 @@ export class ExcelService {
       loadedAt: this.metadata?.loadedAt || null,
       filePath: this.metadata?.filePath || null
     };
+    
+    console.log('📊 Stats:', stats);
+    return stats;
   }
 
-  /**
-   * Validate that all required sheets are present
-   */
   validateData() {
     const requiredSheets = [
       'Trademark Config',
@@ -363,23 +361,14 @@ export class ExcelService {
     };
   }
 
-  /**
-   * Get sheet data by name
-   */
   getSheet(sheetName) {
     return this.data?.[sheetName] || [];
   }
 
-  /**
-   * Get list of all sheet names
-   */
   getSheetNames() {
     return this.data ? Object.keys(this.data) : [];
   }
 
-  /**
-   * Reload data from Excel file
-   */
   async reload() {
     console.log('🔄 Reloading Excel data...');
     this.isLoaded = false;
@@ -388,9 +377,6 @@ export class ExcelService {
     return await this.loadData();
   }
 
-  /**
-   * Clear all data
-   */
   clear() {
     this.isLoaded = false;
     this.data = null;

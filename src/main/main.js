@@ -134,7 +134,7 @@ function setupSecurity() {
 }
 
 function setupIPC() {
-  // Handle Excel data loading
+  // Handle Excel data loading with ExcelJS (secure)
   ipcMain.handle('load-excel-data', async () => {
     try {
       const excelPath = getExcelFilePath();
@@ -144,43 +144,67 @@ function setupIPC() {
         throw new Error(`Excel file not found at: ${excelPath}`);
       }
       
-      // Load SheetJS if available, otherwise return raw buffer
-      let XLSX;
+      // Load ExcelJS (secure alternative)
+      let ExcelJS;
       try {
-        XLSX = require('xlsx');
-      } catch (xlsxError) {
-        console.warn('SheetJS not available, returning raw buffer');
-        const excelBuffer = fs.readFileSync(excelPath);
-        return {
-          success: true,
-          data: null,
-          rawBuffer: Array.from(excelBuffer),
-          filePath: excelPath,
-          parsed: false
-        };
+        ExcelJS = require('exceljs');
+      } catch (excelError) {
+        console.error('ExcelJS not available:', excelError);
+        throw new Error('ExcelJS library not installed. Run: npm install exceljs');
       }
 
-      // Parse Excel file with SheetJS
-      const workbook = XLSX.readFile(excelPath);
+      // Parse Excel file with ExcelJS
+      const workbook = new ExcelJS.Workbook();
+      await workbook.xlsx.readFile(excelPath);
+      
       const parsedData = {};
       
-      Object.keys(workbook.Sheets).forEach(sheetName => {
-        const sheet = workbook.Sheets[sheetName];
-        parsedData[sheetName] = XLSX.utils.sheet_to_json(sheet, {
-          header: 1,
-          raw: false,
-          defval: ''
+      // Convert each worksheet to JSON format
+      workbook.eachSheet((worksheet, sheetId) => {
+        const sheetName = worksheet.name;
+        const rows = [];
+        
+        // Get all rows including header
+        worksheet.eachRow({ includeEmpty: false }, (row, rowNumber) => {
+          const rowData = [];
+          row.eachCell({ includeEmpty: true }, (cell, colNumber) => {
+            // Get cell value, handling different cell types
+            let value = cell.value;
+            
+            // Handle rich text
+            if (value && typeof value === 'object' && value.richText) {
+              value = value.richText.map(t => t.text).join('');
+            }
+            
+            // Handle hyperlinks
+            if (value && typeof value === 'object' && value.text) {
+              value = value.text;
+            }
+            
+            // Handle formulas - use result value
+            if (value && typeof value === 'object' && value.result !== undefined) {
+              value = value.result;
+            }
+            
+            // Convert to string, handle nulls
+            rowData.push(value !== null && value !== undefined ? String(value) : '');
+          });
+          
+          rows.push(rowData);
         });
+        
+        parsedData[sheetName] = rows;
       });
 
-      console.log('Excel data parsed successfully. Sheets:', Object.keys(parsedData));
+      console.log('Excel data parsed successfully with ExcelJS. Sheets:', Object.keys(parsedData));
       
       return {
         success: true,
         data: parsedData,
         filePath: excelPath,
         parsed: true,
-        sheets: Object.keys(parsedData)
+        sheets: Object.keys(parsedData),
+        parser: 'exceljs'
       };
       
     } catch (error) {

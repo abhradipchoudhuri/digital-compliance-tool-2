@@ -1,15 +1,12 @@
 // src/renderer/App.jsx
-// Fixed dropdown default value issue
-
 import React, { useState } from 'react';
-import PropTypes from 'prop-types';
 import { useExcelData } from './index';
 import { ChevronDown, Search, Check, Copy, Download, History, AlertCircle, Info } from 'lucide-react';
 
 const App = () => {
   const excelContext = useExcelData();
   
-  // Form state - FIXED: Initialize with empty string that matches placeholder option
+  // Form state
   const [selectedAssetType, setSelectedAssetType] = useState('');
   const [selectedCountry, setSelectedCountry] = useState('');
   const [selectedBrands, setSelectedBrands] = useState(new Set());
@@ -18,76 +15,15 @@ const App = () => {
   const [generatedCopy, setGeneratedCopy] = useState(null);
   const [isGenerating, setIsGenerating] = useState(false);
   
-  // Mock data - will be replaced by real Excel data
-  const assetTypes = [
-    'Facebook Post', 
-    'Instagram Story',
-    'Twitter Post',
-    'LinkedIn Post',
-    'Email Template',
-    'Banner Ad',
-    'Video Description',
-    'Website Copy'
-  ];
-
-  const countries = [
-    { code: 'US', name: 'United States' },
-    { code: 'UK', name: 'United Kingdom' },
-    { code: 'DE', name: 'Germany' },
-    { code: 'FR', name: 'France' },
-    { code: 'JP', name: 'Japan' },
-    { code: 'AU', name: 'Australia' },
-    { code: 'CA', name: 'Canada' },
-    { code: 'MX', name: 'Mexico' },
-    { code: 'BR', name: 'Brazil' }
-  ];
-
-  // Brown-Forman brands from screenshot
-  const brands = [
-    { id: 'amigos-herradura', name: 'Amigos de Herradura', category: 'Tequila' },
-    { id: 'bf-portfolio', name: 'B-F Portfolio (multi-brand)', category: 'Portfolio' },
-    { id: 'botucal', name: 'Botucal', category: 'Rum' },
-    { id: 'chambord', name: 'Chambord', category: 'Liqueur' },
-    { id: 'cheers-host', name: 'Cheers to the Host (multi-brand)', category: 'Portfolio' },
-    { id: 'coopers-craft', name: 'Cooper\'s Craft', category: 'Bourbon' },
-    { id: 'diplomatico', name: 'Diplomático', category: 'Rum' },
-    { id: 'el-jimador-new', name: 'el Jimador New Mix', category: 'Tequila' },
-    { id: 'fords-gin', name: 'Ford\'s Gin', category: 'Gin' },
-    { id: 'gentleman-jack', name: 'Gentleman Jack', category: 'Whiskey' },
-    { id: 'gentleman-whiskey', name: 'Gentleman Jack Whiskey Sour (RTD)', category: 'RTD' },
-    { id: 'gin-mare', name: 'Gin Mare', category: 'Gin' },
-    { id: 'glenglassaugh', name: 'Glenglassaugh', category: 'Scotch' },
-    { id: 'herradura-tequila', name: 'Herradura Tequila', category: 'Tequila' },
-    { id: 'jack-apple-fizz', name: 'Jack Apple Fizz (RTD)', category: 'RTD' },
-    { id: 'jack-cola-ginger', name: 'Jack & Cola / Ginger / Berry (RTD)', category: 'RTD' },
-    { id: 'jack-apple-tonic', name: 'Jack Apple & Tonic (RTD)', category: 'RTD' },
-    { id: 'jack-daniels-bonded', name: 'Jack Daniel\'s Bonded Series', category: 'Whiskey' },
-    { id: 'jack-daniels-bottled', name: 'Jack Daniel\'s Bottled in Bond', category: 'Whiskey' },
-    { id: 'jack-daniels-country', name: 'Jack Daniel\'s Country Cocktails', category: 'RTD' },
-    { id: 'jack-daniels-fob', name: 'Jack Daniel\'s FOB (multi-brand)', category: 'Portfolio' },
-    { id: 'jack-daniels-lynchburg', name: 'Jack Daniel\'s Lynchburg Lemonade (RTD)', category: 'RTD' },
-    { id: 'jack-daniels-27', name: 'Jack Daniel\'s No. 27 Gold', category: 'Whiskey' },
-    { id: 'jack-daniels-old-7', name: 'Jack Daniel\'s Old No 7', category: 'Whiskey' },
-    { id: 'jack-daniels-sinatra', name: 'Jack Daniel\'s Sinatra Select', category: 'Whiskey' },
-    { id: 'jack-daniels-single-barrel', name: 'Jack Daniel\'s Single Barrel Series', category: 'Whiskey' },
-    { id: 'jack-daniels-tennessee-apple', name: 'Jack Daniel\'s Tennessee Apple', category: 'Flavored Whiskey' },
-    { id: 'jack-daniels-tennessee-fire', name: 'Jack Daniel\'s Tennessee Fire', category: 'Flavored Whiskey' },
-    { id: 'jack-daniels-tennessee-honey', name: 'Jack Daniel\'s Tennessee Honey', category: 'Flavored Whiskey' },
-    { id: 'jack-daniels-tennessee-rye', name: 'Jack Daniel\'s Tennessee Rye', category: 'Whiskey' },
-    { id: 'jack-daniels-triple-mash', name: 'Jack Daniel\'s Triple Mash', category: 'Whiskey' },
-    { id: 'jack-daniels-winter-jack', name: 'Jack Daniel\'s Winter Jack', category: 'Flavored Whiskey' },
-    { id: 'jack-honey-lemonade', name: 'Jack Honey & Lemonade (RTD)', category: 'RTD' },
-    { id: 'master-craft-academy', name: 'Master Craft Academy (multi-brand)', category: 'Portfolio' },
-    { id: 'old-forester', name: 'Old Forester', category: 'Bourbon' },
-    { id: 'slane-irish-whiskey', name: 'Slane Irish Whiskey', category: 'Irish Whiskey' },
-    { id: 'the-glendronnach', name: 'The GlenDronach', category: 'Scotch' },
-    { id: 'woodford-reserve', name: 'Woodford Reserve', category: 'Bourbon' }
-  ];
+  // Get data from Excel context - NOT hardcoded
+  const brands = excelContext.getBrands() || [];
+  const countries = excelContext.getCountries() || [];
+  const assetTypes = excelContext.getAssetTypes() || [];
 
   const filteredBrands = searchQuery
     ? brands.filter(brand => 
         brand.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        brand.category.toLowerCase().includes(searchQuery.toLowerCase())
+        (brand.entity && brand.entity.toLowerCase().includes(searchQuery.toLowerCase()))
       )
     : brands;
 
@@ -100,7 +36,6 @@ const App = () => {
     }
     setSelectedBrands(newSelection);
     
-    // Show multi-brand note if more than one brand selected
     if (newSelection.size > 1) {
       setShowMultiBrandNote(true);
       setTimeout(() => setShowMultiBrandNote(false), 3000);
@@ -108,7 +43,6 @@ const App = () => {
   };
 
   const handleGenerate = async () => {
-    // FIXED: Check only for empty string
     if (!selectedAssetType) {
       alert('Please select an Asset Type');
       return;
@@ -124,7 +58,6 @@ const App = () => {
 
     setIsGenerating(true);
     
-    // Simulate copy generation
     setTimeout(() => {
       const selectedBrandNames = Array.from(selectedBrands)
         .map(id => brands.find(b => b.id === id)?.name)
@@ -142,7 +75,6 @@ const App = () => {
 
   const copyToClipboard = (text) => {
     navigator.clipboard.writeText(text);
-    // You could add a toast notification here
   };
 
   return (
@@ -171,11 +103,11 @@ const App = () => {
               Instructions
             </h2>
             <div className="text-blue-800 space-y-2 text-sm">
-              <p><strong>1.</strong> Select your Asset Type ▶ Please visit our <a href="#" className="text-blue-600 underline">Resource Library</a> for further guidance on the Asset Types.</p>
+              <p><strong>1.</strong> Select your Asset Type</p>
               <p><strong>2.</strong> Select your Country</p>
               <p><strong>3.</strong> Select the brand(s) associated with your asset</p>
-              <p><strong>4.</strong> Click Generate. Your results may take up to 5 seconds to load. You may need to scroll up to see the generated copy.</p>
-              <p><strong>5.</strong> Once your copy is generated, click the "Copy & Close" button to copy the generated text to your clipboard. Repeat steps 1 through 5 for any additional copy needs.</p>
+              <p><strong>4.</strong> Click Generate</p>
+              <p><strong>5.</strong> Copy the generated text to your clipboard</p>
             </div>
           </div>
 
@@ -197,7 +129,7 @@ const App = () => {
                 Multi-Brands
               </h3>
               <p className="text-amber-700 text-sm">
-                If you need copy for a multi-brand item, such as Bar-Fabric, please DO NOT select any other single brands, ie. Benriach, because the copy will not generate.
+                If you need copy for a multi-brand item, please DO NOT select any other single brands.
               </p>
             </div>
           </div>
@@ -209,7 +141,7 @@ const App = () => {
                 <span className="font-medium">Multi-Brand Selection Notice</span>
               </div>
               <p className="text-amber-700 text-sm mt-1">
-                You have selected multiple brands. Please ensure this is correct or select only multi-brand items like Bar-Fabric.
+                You have selected multiple brands. Please ensure this is correct.
               </p>
             </div>
           )}
@@ -217,7 +149,7 @@ const App = () => {
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8">
             {/* Form Section */}
             <div className="space-y-8">
-              {/* Asset Type Selector - FIXED */}
+              {/* Asset Type Selector */}
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-3">
                   Please select the Asset Type*
@@ -229,9 +161,9 @@ const App = () => {
                     className="w-full px-4 py-3 border border-gray-300 rounded-lg appearance-none bg-white text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200"
                   >
                     <option value="">Select Asset Type</option>
-                    {assetTypes.map((type, index) => (
-                      <option key={index} value={type}>
-                        {type}
+                    {assetTypes.map((type) => (
+                      <option key={type.id} value={type.name}>
+                        {type.name}
                       </option>
                     ))}
                   </select>
@@ -297,9 +229,11 @@ const App = () => {
                           <div className="font-medium text-gray-900 text-sm group-hover:text-blue-700 transition-colors">
                             {brand.name}
                           </div>
-                          <div className="text-xs text-gray-500">
-                            {brand.category}
-                          </div>
+                          {brand.entity && (
+                            <div className="text-xs text-gray-500">
+                              {brand.entity}
+                            </div>
+                          )}
                         </div>
                         {selectedBrands.has(brand.id) && (
                           <Check className="text-blue-600" size={16} />
@@ -390,10 +324,9 @@ const App = () => {
             <div className="mt-8 bg-gray-100 border rounded-lg p-4">
               <h4 className="text-sm font-medium text-gray-700 mb-2">Development Status</h4>
               <div className="text-xs text-gray-600 space-y-1">
-                <div>Excel Context: {Object.keys(excelContext).length} methods</div>
-                <div>UI Components: ✅ Complete</div>
-                <div>Copy Generation: ⚠️ Using mock data - connect to templateService</div>
-                <div>Brand Data: ✅ Real Brown-Forman brands loaded</div>
+                <div>Brands loaded: {brands.length}</div>
+                <div>Countries loaded: {countries.length}</div>
+                <div>Asset Types loaded: {assetTypes.length}</div>
               </div>
             </div>
           )}
@@ -403,14 +336,12 @@ const App = () => {
       {/* Footer */}
       <footer className="bg-gray-800 text-gray-300 py-6 mt-12">
         <div className="container mx-auto px-6 text-center">
-          <p className="text-sm">Built with ❤️ for Brown-Forman Corporation</p>
-          <p className="text-xs text-gray-400 mt-1">Digital Compliance Tool v1.0.0 - Ensuring legal compliance worldwide</p>
+          <p className="text-sm">Built for Brown-Forman Corporation</p>
+          <p className="text-xs text-gray-400 mt-1">Digital Compliance Tool v1.0.0</p>
         </div>
       </footer>
     </div>
   );
 };
-
-App.propTypes = {};
 
 export default App;

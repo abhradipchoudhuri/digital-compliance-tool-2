@@ -1,5 +1,5 @@
 // src/renderer/App.jsx
-// Enhanced App component with Brown-Forman Digital Compliance Tool UI
+// Fixed dropdown default value issue
 
 import React, { useState } from 'react';
 import PropTypes from 'prop-types';
@@ -9,7 +9,7 @@ import { ChevronDown, Search, Check, Copy, Download, History, AlertCircle, Info 
 const App = () => {
   const excelContext = useExcelData();
   
-  // Form state
+  // Form state - FIXED: Initialize with empty string that matches placeholder option
   const [selectedAssetType, setSelectedAssetType] = useState('');
   const [selectedCountry, setSelectedCountry] = useState('');
   const [selectedBrands, setSelectedBrands] = useState(new Set());
@@ -20,7 +20,6 @@ const App = () => {
   
   // Mock data - will be replaced by real Excel data
   const assetTypes = [
-    'Select Asset Type',
     'Facebook Post', 
     'Instagram Story',
     'Twitter Post',
@@ -109,7 +108,8 @@ const App = () => {
   };
 
   const handleGenerate = async () => {
-    if (!selectedAssetType || selectedAssetType === 'Select Asset Type') {
+    // FIXED: Check only for empty string
+    if (!selectedAssetType) {
       alert('Please select an Asset Type');
       return;
     }
@@ -217,7 +217,7 @@ const App = () => {
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8">
             {/* Form Section */}
             <div className="space-y-8">
-              {/* Asset Type Selector */}
+              {/* Asset Type Selector - FIXED */}
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-3">
                   Please select the Asset Type*
@@ -228,8 +228,9 @@ const App = () => {
                     onChange={(e) => setSelectedAssetType(e.target.value)}
                     className="w-full px-4 py-3 border border-gray-300 rounded-lg appearance-none bg-white text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200"
                   >
+                    <option value="">Select Asset Type</option>
                     {assetTypes.map((type, index) => (
-                      <option key={index} value={type} disabled={index === 0}>
+                      <option key={index} value={type}>
                         {type}
                       </option>
                     ))}

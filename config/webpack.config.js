@@ -2,39 +2,31 @@ const path = require('path');
 const HtmlWebpackPlugin = require('html-webpack-plugin');
 const CopyWebpackPlugin = require('copy-webpack-plugin');
 
-const isDevelopment = process.env.NODE_ENV === 'development';
+const isDevelopment = process.env.NODE_ENV !== 'production';
 
 module.exports = {
   target: 'electron-renderer',
   mode: isDevelopment ? 'development' : 'production',
   
-  entry: './src/renderer/index.js',
+  entry: path.resolve(__dirname, '../src/renderer/index.js'),
   
   output: {
     path: path.resolve(__dirname, '../dist'),
     filename: 'renderer.js',
-    publicPath: isDevelopment ? '/' : './',  // Fixed: Remove http://localhost:3000
-    clean: true, // Clean output directory before each build
+    publicPath: '/',
+    clean: true,
   },
   
   devServer: {
     port: 3000,
-    host: 'localhost', // Explicitly set host
     hot: true,
-    open: false, // Don't auto-open browser
-    historyApiFallback: true, // CRITICAL: Serve index.html for all routes
+    open: false,
+    historyApiFallback: true,
     static: {
       directory: path.resolve(__dirname, '../dist'),
-      publicPath: '/',
     },
-    allowedHosts: 'all', // Allow connections from Electron
     headers: {
       'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, PATCH, OPTIONS',
-      'Access-Control-Allow-Headers': 'X-Requested-With, content-type, Authorization',
-    },
-    client: {
-      webSocketURL: 'ws://localhost:3000/ws', // Explicit WebSocket URL
     },
   },
   
@@ -48,9 +40,7 @@ module.exports = {
           options: {
             presets: [
               ['@babel/preset-env', {
-                targets: {
-                  electron: '37.3.1'
-                }
+                targets: { electron: '37' }
               }],
               ['@babel/preset-react', {
                 runtime: 'automatic'
@@ -74,20 +64,19 @@ module.exports = {
     new HtmlWebpackPlugin({
       template: path.resolve(__dirname, '../src/renderer/index.html'),
       filename: 'index.html',
-      inject: 'body', // Inject scripts at end of body
-      minify: false, // Don't minify in development
+      inject: 'body',
     }),
     new CopyWebpackPlugin({
       patterns: [
         {
           from: path.resolve(__dirname, '../data'),
           to: path.resolve(__dirname, '../dist/data'),
-          noErrorOnMissing: true, // Don't fail if directory doesn't exist
+          noErrorOnMissing: true,
         },
         {
           from: path.resolve(__dirname, '../assets'),
           to: path.resolve(__dirname, '../dist/assets'),
-          noErrorOnMissing: true, // Don't fail if directory doesn't exist
+          noErrorOnMissing: true,
         },
       ],
     }),
@@ -106,11 +95,9 @@ module.exports = {
   
   devtool: isDevelopment ? 'eval-source-map' : 'source-map',
   
-  // Performance hints
   performance: {
-    hints: false, // Disable performance warnings in development
+    hints: false,
   },
   
-  // Stats configuration for cleaner output
-  stats: isDevelopment ? 'minimal' : 'normal',
+  stats: 'minimal',
 };

@@ -1,5 +1,5 @@
 // src/renderer/App.jsx
-// Quick fix to handle undefined stats
+// Matches the exact UI from your screenshot
 
 import React, { useState } from 'react';
 import { useExcelData } from './index';
@@ -7,146 +7,215 @@ import { useExcelData } from './index';
 const App = () => {
   const excelContext = useExcelData();
   
-  // ✅ SAFE: Provide fallback values if stats is undefined
-  const stats = excelContext?.stats || {
-    totalSheets: 0,
-    totalBrands: 0,
-    totalCountries: 0,
-    totalAssetTypes: 0
+  // Get data from context
+  const brands = excelContext.getBrands ? excelContext.getBrands() : [];
+  const countries = excelContext.getCountries ? excelContext.getCountries() : [];
+  const assetTypes = excelContext.getAssetTypes ? excelContext.getAssetTypes() : [];
+
+  // Form state
+  const [selectedAssetType, setSelectedAssetType] = useState('Facebook Post');
+  const [selectedCountry, setSelectedCountry] = useState('');
+  const [selectedBrands, setSelectedBrands] = useState([]);
+  const [brandSearch, setBrandSearch] = useState('');
+
+  // Filter brands by search
+  const filteredBrands = brands.filter(brand =>
+    brand.name?.toLowerCase().includes(brandSearch.toLowerCase())
+  );
+
+  // Toggle brand selection
+  const toggleBrand = (brandId) => {
+    setSelectedBrands(prev =>
+      prev.includes(brandId)
+        ? prev.filter(id => id !== brandId)
+        : [...prev, brandId]
+    );
   };
 
-  // Get methods from context safely
-  const getBrands = excelContext?.getBrands || (() => []);
-  const getCountries = excelContext?.getCountries || (() => []);
-  const getAssetTypes = excelContext?.getAssetTypes || (() => []);
-
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-100">
       {/* Header */}
-      <header className="bg-bf-blue text-bf-gold p-4">
-        <div className="container mx-auto">
-          <h1 className="text-2xl font-bold">Digital Compliance Tool</h1>
-          <p className="text-sm opacity-90">Brown-Forman Legal Copy Generator</p>
+      <header className="bg-bf-blue text-white p-4 shadow-md">
+        <div className="container mx-auto flex items-center">
+          <div className="w-12 h-12 rounded-full bg-bf-gold flex items-center justify-center text-bf-blue font-bold text-xl mr-4">
+            BF
+          </div>
+          <div>
+            <h1 className="text-2xl font-semibold">Digital Compliance Legal Copy Generator</h1>
+            <p className="text-sm opacity-90">Brown-Forman Corporation</p>
+          </div>
         </div>
       </header>
 
       {/* Main Content */}
-      <main className="container mx-auto p-6">
-        <div className="bg-white rounded-lg shadow-lg p-6">
-          <h2 className="text-xl font-semibold mb-4 text-bf-blue">
-            📊 Excel Data Status
-          </h2>
+      <main className="container mx-auto px-4 py-6 max-w-6xl">
+        
+        {/* Instructions Box */}
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-6 mb-6">
+          <div className="flex items-start mb-4">
+            <svg className="w-6 h-6 text-blue-600 mr-2 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+            </svg>
+            <h2 className="text-lg font-semibold text-blue-900">Instructions</h2>
+          </div>
+          <ol className="space-y-2 text-blue-800">
+            <li className="flex">
+              <span className="font-semibold mr-2">1.</span>
+              <span>Select your Asset Type ▶ Please visit our <a href="#" className="text-blue-600 underline">Resource Library</a> for further guidance on the Asset Types.</span>
+            </li>
+            <li className="flex">
+              <span className="font-semibold mr-2">2.</span>
+              <span>Select your Country</span>
+            </li>
+            <li className="flex">
+              <span className="font-semibold mr-2">3.</span>
+              <span>Select the brand(s) associated with your asset</span>
+            </li>
+            <li className="flex">
+              <span className="font-semibold mr-2">4.</span>
+              <span>Click Generate. Your results may take up to 5 seconds to load. You may need to scroll up to see the generated copy.</span>
+            </li>
+            <li className="flex">
+              <span className="font-semibold mr-2">5.</span>
+              <span>Once your copy is generated, click the "Copy & Close" button to copy the generated text to your clipboard. Repeat steps 1 through 5 for any additional copy needs.</span>
+            </li>
+          </ol>
+        </div>
+
+        {/* Alert Boxes */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+          {/* Country/Market Specifics */}
+          <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+            <div className="flex items-start">
+              <div className="w-3 h-3 rounded-full bg-green-500 mr-3 mt-1"></div>
+              <div>
+                <h3 className="font-semibold text-green-900 mb-1">Country/Market Specifics</h3>
+                <p className="text-sm text-green-800">
+                  There will be additional detailed instructions included with your copy if your market has local requirements.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Multi-Brands */}
+          <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
+            <div className="flex items-start">
+              <div className="w-3 h-3 rounded-full bg-orange-500 mr-3 mt-1"></div>
+              <div>
+                <h3 className="font-semibold text-orange-900 mb-1">Multi-Brands</h3>
+                <p className="text-sm text-orange-800">
+                  If you need copy for a multi-brand item, such as Bar-Fabric, please DO NOT select any other single brands, ie. Benriach, because the copy will not generate.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Form */}
+        <div className="bg-white rounded-lg shadow-md p-6">
           
-          {/* Display Excel data stats */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-            <div className="bg-gradient-to-br from-green-500 to-green-600 text-white p-4 rounded-lg text-center shadow-md">
-              <div className="text-3xl font-bold">{stats.totalSheets}</div>
-              <div className="text-sm opacity-90">Excel Sheets</div>
-            </div>
-            <div className="bg-gradient-to-br from-blue-500 to-blue-600 text-white p-4 rounded-lg text-center shadow-md">
-              <div className="text-3xl font-bold">{stats.totalBrands}</div>
-              <div className="text-sm opacity-90">Brands</div>
-            </div>
-            <div className="bg-gradient-to-br from-purple-500 to-purple-600 text-white p-4 rounded-lg text-center shadow-md">
-              <div className="text-3xl font-bold">{stats.totalCountries}</div>
-              <div className="text-sm opacity-90">Countries</div>
-            </div>
-            <div className="bg-gradient-to-br from-orange-500 to-orange-600 text-white p-4 rounded-lg text-center shadow-md">
-              <div className="text-3xl font-bold">{stats.totalAssetTypes}</div>
-              <div className="text-sm opacity-90">Asset Types</div>
-            </div>
+          {/* Asset Type Dropdown */}
+          <div className="mb-6">
+            <label className="block text-gray-700 font-medium mb-2">
+              Please select the Asset Type<span className="text-red-500">*</span>
+            </label>
+            <select
+              value={selectedAssetType}
+              onChange={(e) => setSelectedAssetType(e.target.value)}
+              className="w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+            >
+              <option value="">Select Asset Type</option>
+              {assetTypes.map((type) => (
+                <option key={type.id} value={type.name}>
+                  {type.name}
+                </option>
+              ))}
+            </select>
           </div>
 
-          {/* Status Messages */}
-          <div className="space-y-3">
-            {stats.totalSheets > 0 ? (
-              <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-                <div className="flex items-center">
-                  <span className="text-2xl mr-3">✅</span>
-                  <div>
-                    <h3 className="font-semibold text-green-900">Excel File Loaded</h3>
-                    <p className="text-sm text-green-700">
-                      Successfully loaded {stats.totalSheets} sheets from Excel file
-                    </p>
-                  </div>
-                </div>
-              </div>
-            ) : (
-              <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-                <div className="flex items-center">
-                  <span className="text-2xl mr-3">❌</span>
-                  <div>
-                    <h3 className="font-semibold text-red-900">Excel File Not Loaded</h3>
-                    <p className="text-sm text-red-700">
-                      Unable to load Excel data. Check console for errors.
-                    </p>
-                  </div>
-                </div>
-              </div>
-            )}
+          {/* Country Dropdown */}
+          <div className="mb-6">
+            <label className="block text-gray-700 font-medium mb-2">
+              Please select the Country<span className="text-red-500">*</span>
+            </label>
+            <select
+              value={selectedCountry}
+              onChange={(e) => setSelectedCountry(e.target.value)}
+              className="w-full p-3 border-2 border-yellow-400 rounded-md focus:outline-none focus:ring-2 focus:ring-yellow-500 bg-white"
+            >
+              <option value="">Select Country</option>
+              {countries.map((country) => (
+                <option key={country.code} value={country.code}>
+                  {country.name}
+                </option>
+              ))}
+            </select>
+          </div>
 
-            {stats.totalBrands === 0 && stats.totalSheets > 0 ? (
-              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-                <div className="flex items-center">
-                  <span className="text-2xl mr-3">⚠️</span>
-                  <div>
-                    <h3 className="font-semibold text-yellow-900">Column Name Mismatch Detected</h3>
-                    <p className="text-sm text-yellow-700">
-                      Excel loaded but no data extracted. Your Excel column names don't match the filter logic.
-                    </p>
-                    <div className="mt-2 text-xs bg-yellow-100 rounded p-2">
-                      <strong>Your Excel columns:</strong><br/>
-                      • Trademark Config: Display Names, Brand Names, Entity Names<br/>
-                      • CountryLanguage: Abbv, Country, Language<br/><br/>
-                      <strong>Expected by filter logic:</strong><br/>
-                      • Trademark Config: Type, ID, Name, Entity<br/>
-                      • CountryLanguage: CountryCode, CountryName, Language<br/><br/>
-                      → Update excelService.js to match your column names (see fix below)
+          {/* Brands Section */}
+          <div className="mb-6">
+            <label className="block text-gray-700 font-medium mb-2">
+              Please select the Brands (Check all that apply)<span className="text-red-500">*</span>
+            </label>
+            
+            {/* Search Box */}
+            <div className="relative mb-4">
+              <svg className="absolute left-3 top-3.5 w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+              <input
+                type="text"
+                placeholder="Search brands..."
+                value={brandSearch}
+                onChange={(e) => setBrandSearch(e.target.value)}
+                className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+
+            {/* Brands Grid */}
+            <div className="border border-gray-300 rounded-md p-4 max-h-80 overflow-y-auto">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                {filteredBrands.map((brand) => (
+                  <label key={brand.id} className="flex items-start cursor-pointer hover:bg-gray-50 p-2 rounded">
+                    <input
+                      type="checkbox"
+                      checked={selectedBrands.includes(brand.id)}
+                      onChange={() => toggleBrand(brand.id)}
+                      className="mt-1 w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                    />
+                    <div className="ml-3">
+                      <div className="text-gray-900 font-medium">{brand.name}</div>
+                      <div className="text-sm text-gray-500">{brand.entity}</div>
                     </div>
-                  </div>
-                </div>
+                  </label>
+                ))}
               </div>
-            ) : null}
-          </div>
-
-          {/* Debug Info */}
-          <div className="mt-6 bg-gray-50 border border-gray-200 rounded-lg p-4">
-            <h3 className="font-semibold text-gray-700 mb-3">🔍 Debug Information</h3>
-            <div className="text-sm text-gray-600 space-y-1">
-              <p><strong>Sheets Loaded:</strong> {stats.totalSheets}</p>
-              <p><strong>Brands Extracted:</strong> {stats.totalBrands}</p>
-              <p><strong>Countries Extracted:</strong> {stats.totalCountries}</p>
-              <p><strong>Asset Types Extracted:</strong> {stats.totalAssetTypes}</p>
-              <p className="mt-2 pt-2 border-t border-gray-300">
-                <strong>Next Step:</strong> {stats.totalBrands === 0 ? 
-                  'Update excelService.js with the fixed version to match your Excel column names' : 
-                  'Excel data connected successfully! Continue building your app.'
-                }
-              </p>
             </div>
           </div>
 
-          {/* Instructions */}
-          <div className="mt-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
-            <h3 className="font-semibold text-blue-900 mb-2">📝 To Fix the Column Mismatch:</h3>
-            <ol className="text-sm text-blue-700 space-y-2 ml-4 list-decimal">
-              <li>Replace your <code className="bg-blue-100 px-1 rounded">excelService.js</code> with the FIXED version (see artifact)</li>
-              <li>Restart the app: <code className="bg-blue-100 px-1 rounded">npm start</code></li>
-              <li>Check the stats above - all numbers should be {'>'} 0</li>
-              <li>Once working, add the DataDebugger component to inspect data structure</li>
-            </ol>
+          {/* Generate Button */}
+          <div className="flex justify-end">
+            <button
+              disabled={!selectedAssetType || !selectedCountry || selectedBrands.length === 0}
+              className={`px-8 py-3 rounded-md font-semibold transition-colors ${
+                selectedAssetType && selectedCountry && selectedBrands.length > 0
+                  ? 'bg-blue-600 text-white hover:bg-blue-700'
+                  : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+              }`}
+              onClick={() => {
+                console.log('Generate clicked:', {
+                  assetType: selectedAssetType,
+                  country: selectedCountry,
+                  brands: selectedBrands
+                });
+                alert('Copy generation will be implemented next!');
+              }}
+            >
+              Generate
+            </button>
           </div>
         </div>
       </main>
-
-      {/* Footer */}
-      <footer className="bg-bf-blue text-bf-gold p-4 mt-8">
-        <div className="container mx-auto text-center">
-          <p className="text-sm opacity-90">
-            Digital Compliance Tool - Brown-Forman Corporation
-          </p>
-        </div>
-      </footer>
     </div>
   );
 };

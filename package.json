@@ -9,10 +9,11 @@
     "test": "tests"
   },
   "scripts": {
-    "start": "concurrently \"npm run webpack-dev\" \"wait-on http://localhost:3000 && electron .\"",
+    "start": "concurrently \"npm run webpack-dev\" \"npm run electron-dev\"",
     "webpack-dev": "webpack serve --config config/webpack.config.js --mode development",
     "webpack-prod": "webpack --mode production",
     "electron": "electron .",
+    "electron-dev": "wait-on http://localhost:3000 && cross-env NODE_ENV=development electron .",
     "build": "npm run webpack-prod && electron-builder",
     "dist": "npm run build",
     "pack": "electron-builder --dir",

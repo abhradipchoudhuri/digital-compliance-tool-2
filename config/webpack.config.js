@@ -16,6 +16,7 @@ module.exports = {
     filename: 'renderer.js',
     publicPath: '/',
     clean: true,
+    globalObject: 'this', // Fix for global is not defined
   },
   
   devServer: {
@@ -62,6 +63,12 @@ module.exports = {
   },
   
   plugins: [
+    new webpack.ProvidePlugin({
+      global: path.resolve(__dirname, './global-polyfill.js'), // Provide global polyfill
+    }),
+    new webpack.DefinePlugin({
+      'process.env.NODE_ENV': JSON.stringify(isDevelopment ? 'development' : 'production'),
+    }),
     new HtmlWebpackPlugin({
       template: path.resolve(__dirname, '../src/renderer/index.html'),
       filename: 'index.html',
@@ -92,6 +99,18 @@ module.exports = {
       '@hooks': path.resolve(__dirname, '../src/renderer/hooks'),
       '@utils': path.resolve(__dirname, '../src/renderer/utils'),
     },
+    fallback: {
+      "stream": false,
+      "crypto": false,
+      "buffer": false,
+      "util": false,
+      "assert": false,
+      "http": false,
+      "https": false,
+      "os": false,
+      "url": false,
+      "zlib": false,
+    }
   },
   
   devtool: isDevelopment ? 'eval-source-map' : 'source-map',

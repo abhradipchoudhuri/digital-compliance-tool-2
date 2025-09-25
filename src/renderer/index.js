@@ -3,20 +3,213 @@ import ReactDOM from 'react-dom/client';
 import './styles/globals.css';
 import App from './App';
 
-// ===== TEMPORARILY DISABLED FOR DEBUGGING =====
-// These imports require dependencies that may not exist yet:
-// import PropTypes from 'prop-types';
-// import { ExcelService } from './services/excelService';
-// import { Logger } from './utils/logger';
+// Import services (with fallback if not available)
+let ExcelService, Logger;
+try {
+  ExcelService = require('./services/excelService').ExcelService;
+  Logger = require('./utils/logger').Logger;
+} catch (e) {
+  console.warn('Services not found, using mock implementations');
+  // Mock implementations
+  ExcelService = class {
+    async loadData() {
+      return { 
+        success: false, 
+        error: 'ExcelService not implemented yet',
+        data: {} 
+      };
+    }
+  };
+  Logger = class {
+    info(...args) { console.log('[INFO]', ...args); }
+    error(...args) { console.error('[ERROR]', ...args); }
+    warn(...args) { console.warn('[WARN]', ...args); }
+  };
+}
 
-// Simple logger replacement for debugging
-const logger = {
-  info: (...args) => console.log('[INFO]', ...args),
-  error: (...args) => console.error('[ERROR]', ...args),
-  warn: (...args) => console.warn('[WARN]', ...args)
+const logger = new Logger('App');
+
+// ===== EXCEL DATA CONTEXT =====
+const ExcelDataContext = React.createContext(null);
+
+export const useExcelData = () => {
+  const context = React.useContext(ExcelDataContext);
+  if (!context) {
+    throw new Error('useExcelData must be used within ExcelDataProvider');
+  }
+  return context;
 };
 
-// ===== SIMPLE ERROR BOUNDARY =====
+const ExcelDataProvider = ({ children, data }) => {
+  const contextValue = {
+    rawData: data,
+    getBrands: () => {
+      const config = data['Trademark Config'] || [];
+      return config.filter(row => row.Type === 'Brand').map(row => ({
+        id: row.ID,
+        name: row.Name,
+        entity: row.Entity
+      }));
+    },
+    getCountries: () => {
+      const countryLang = data['CountryLanguage'] || [];
+      const unique = [...new Map(countryLang.map(r => [r.CountryCode, r])).values()];
+      return unique.map(row => ({
+        code: row.CountryCode,
+        name: row.CountryName,
+        language: row.Language
+      }));
+    },
+    getAssetTypes: () => {
+      const config = data['Trademark Config'] || [];
+      return config.filter(row => row.Type === 'Asset Type').map(row => ({
+        id: row.ID,
+        name: row.Name,
+        description: row.Description
+      }));
+    }
+  };
+
+  return (
+    <ExcelDataContext.Provider value={contextValue}>
+      {children}
+    </ExcelDataContext.Provider>
+  );
+};
+
+// ===== APP WRAPPER WITH EXCEL LOADING =====
+class AppWrapper extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = {
+      isLoading: true,
+      error: null,
+      excelData: null,
+      mode: 'unknown'
+    };
+    this.excelService = new ExcelService();
+  }
+
+  async componentDidMount() {
+    try {
+      logger.info('Initializing Digital Compliance Tool...');
+      
+      // Detect environment
+      const isElectron = !!window.electronAPI;
+      const mode = isElectron ? 'electron' : 'browser';
+      
+      logger.info(`Running in ${mode} mode`);
+      
+      this.setState({ mode });
+      
+      // Try to load Excel data (will work in Electron, may fail in browser)
+      await this.loadExcelData();
+      
+    } catch (error) {
+      logger.error('Initialization error:', error);
+      this.setState({
+        isLoading: false,
+        error: error.message
+      });
+    }
+  }
+
+  async loadExcelData() {
+    try {
+      logger.info('Attempting to load Excel data...');
+      
+      const result = await this.excelService.loadData();
+      
+      if (result.success) {
+        logger.info('✅ Excel data loaded successfully');
+        logger.info('Available sheets:', Object.keys(result.data));
+        
+        this.setState({
+          isLoading: false,
+          excelData: result.data,
+          error: null
+        });
+      } else {
+        // Excel loading failed, but continue with mock data
+        logger.warn('⚠️ Excel data not available:', result.error);
+        
+        this.setState({
+          isLoading: false,
+          excelData: this.getMockData(),
+          error: `Running in demo mode: ${result.error}`
+        });
+      }
+    } catch (error) {
+      logger.warn('Excel loading failed, using mock data');
+      
+      this.setState({
+        isLoading: false,
+        excelData: this.getMockData(),
+        error: `Demo mode: ${error.message}`
+      });
+    }
+  }
+
+  getMockData() {
+    // Minimal mock data structure for testing
+    return {
+      'Trademark Config': [
+        { Type: 'Brand', ID: 'chambord', Name: 'Chambord', Entity: 'Brown-Forman' },
+        { Type: 'Brand', ID: 'jd', Name: 'Jack Daniel\'s', Entity: 'Brown-Forman' },
+        { Type: 'Asset Type', ID: 'website', Name: 'Website Copy', Description: 'Web content' },
+        { Type: 'Asset Type', ID: 'social', Name: 'Social Media', Description: 'Social posts' }
+      ],
+      'CountryLanguage': [
+        { CountryCode: 'US', CountryName: 'United States', Language: 'English' },
+        { CountryCode: 'GB', CountryName: 'United Kingdom', Language: 'English' }
+      ],
+      'Trademark Language': [],
+      'Trademark Structure': [],
+      'Language Dependent Variables': [],
+      'Overall Structure': [],
+      'Help Text': []
+    };
+  }
+
+  render() {
+    const { isLoading, error, excelData, mode } = this.state;
+
+    // Loading screen
+    if (isLoading) {
+      return (
+        <div className="min-h-screen bg-blue-900 flex items-center justify-center">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-yellow-400 mx-auto mb-4"></div>
+            <h2 className="text-2xl font-semibold text-yellow-400 mb-2">
+              Loading Digital Compliance Tool
+            </h2>
+            <p className="text-yellow-400 opacity-80">
+              Initializing Excel data...
+            </p>
+          </div>
+        </div>
+      );
+    }
+
+    // Render app with data (even if using mock data)
+    return (
+      <div>
+        {/* Dev mode banner */}
+        {error && (
+          <div className="bg-yellow-500 text-yellow-900 px-4 py-2 text-sm">
+            ⚠️ {mode === 'browser' ? 'Browser Dev Mode' : 'Demo Mode'}: {error}
+          </div>
+        )}
+        
+        <ExcelDataProvider data={excelData}>
+          <App />
+        </ExcelDataProvider>
+      </div>
+    );
+  }
+}
+
+// ===== ERROR BOUNDARY =====
 class ErrorBoundary extends React.Component {
   constructor(props) {
     super(props);
@@ -28,7 +221,7 @@ class ErrorBoundary extends React.Component {
   }
 
   componentDidCatch(error, errorInfo) {
-    logger.error('React Error Boundary caught an error:', error, errorInfo);
+    logger.error('Error caught:', error, errorInfo);
   }
 
   render() {
@@ -52,43 +245,15 @@ class ErrorBoundary extends React.Component {
   }
 }
 
-// ===== RENDER APP DIRECTLY (NO COMPLEX LOADING) =====
+// ===== RENDER =====
 const root = ReactDOM.createRoot(document.getElementById('root'));
 
 root.render(
   <ErrorBoundary>
-    <App />
+    <AppWrapper />
   </ErrorBoundary>
 );
 
-logger.info('Digital Compliance Tool renderer started');
+logger.info('Digital Compliance Tool started');
 
-// ===== COMMENTED OUT: ORIGINAL COMPLEX INITIALIZATION =====
-/*
-// This was blocking the app from rendering:
-
-class AppWrapper extends React.Component {
-  constructor(props) {
-    super(props);
-    this.state = {
-      isLoading: true,
-      error: null,
-      excelData: null,
-      appReady: false
-    };
-    this.excelService = new ExcelService();
-  }
-
-  async componentDidMount() {
-    // This check was blocking browser dev mode:
-    if (!window.electronAPI) {
-      throw new Error('Electron API not available...');
-    }
-    // ... rest of initialization
-  }
-  // ... rest of AppWrapper code
-}
-
-// ExcelDataProvider and context also commented out
-// We'll add these back once basic rendering works
-*/
+export { ExcelDataContext };

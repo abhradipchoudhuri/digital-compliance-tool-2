@@ -6,7 +6,7 @@ const { autoUpdater } = require('electron-updater');
 // Keep a global reference of the window object
 let mainWindow;
 
-const isDev = process.env.NODE_ENV === !app.isPackaged;
+const isDev = !app.isPackaged || process.env.NODE_ENV === 'development';
 const isMac = process.platform === 'darwin';
 
 // Enable live reload for development

@@ -185,6 +185,9 @@ export class ExcelService {
           name: name,
           language: row.Language || 'English'
         });
+      } else if (code && name && uniqueCountries.has(code)) {
+        // LOG DUPLICATE ENTRIES
+        console.log(`⚠️ DUPLICATE COUNTRY CODE "${code}": ${name} (${row.Language}) - SKIPPED (already have ${uniqueCountries.get(code).name})`);
       }
     });
     

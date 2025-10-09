@@ -3,7 +3,7 @@
 
 import React, { useState } from 'react';
 import PropTypes from 'prop-types';
-import { useExcelData } from './index';
+import { useExcelData } from './hooks/useDataLoader';
 import { ChevronDown, Search, Check, Copy, Download, History, AlertCircle, Info } from 'lucide-react';
 
 const App = () => {

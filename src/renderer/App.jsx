@@ -6,7 +6,7 @@ import { ChevronDown, Search, Check, Copy, Download, History, AlertCircle, Info 
 
 const App = () => {
   // Get data from Excel hook
-  const { brands = [], countries = [], assetTypes = [], loading, error } = useExcelData();
+  const { brands: rawBrands = [], countries: rawCountries = [], assetTypes: rawAssetTypes = [], loading, error } = useExcelData();
   
   // Form state
   const [selectedAssetType, setSelectedAssetType] = useState('');
@@ -16,6 +16,19 @@ const App = () => {
   const [showMultiBrandNote, setShowMultiBrandNote] = useState(false);
   const [generatedCopy, setGeneratedCopy] = useState(null);
   const [isGenerating, setIsGenerating] = useState(false);
+
+  // Process brands with unique IDs
+  const brands = rawBrands.map((brand, index) => ({
+    id: `${brand.id}-${index}`, // Make ID unique by adding index
+    name: brand.name,
+    entity: brand.entity
+  }));
+
+  // Sort countries alphabetically
+  const countries = [...rawCountries].sort((a, b) => a.name.localeCompare(b.name));
+
+  // Process asset types
+  const assetTypes = rawAssetTypes;
 
   const filteredBrands = searchQuery
     ? brands.filter(brand => 

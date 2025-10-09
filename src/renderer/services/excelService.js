@@ -153,7 +153,7 @@ export class ExcelService {
   /**
    * Get countries from CountryLanguage sheet
    * YOUR EXCEL COLUMNS: 'Abbv', 'Country', 'Language'
-   * FIXED: Handles empty Abbv codes by generating them
+   * FIXED: Handles empty Abbv codes and multi-language countries
    */
   getCountries() {
     if (!this.data || !this.data['CountryLanguage']) {
@@ -161,12 +161,13 @@ export class ExcelService {
       return [];
     }
     
-    const uniqueCountries = new Map();
-    let skippedEmptyName = 0;
+    const countries = [];
+    const countryCodes = new Set();
     
     this.data['CountryLanguage'].forEach(row => {
       let code = row.Abbv || row.CountryCode || row['Country Code'];
       const name = row.Country || row.CountryName || row['Country Name'];
+      const language = row.Language || 'English';
       
       // Handle empty codes: generate from country name
       if (!code || code.trim() === '') {
@@ -183,24 +184,28 @@ export class ExcelService {
       // Check if country name is empty
       if (!name || name.trim() === '') {
         console.log(`⚠️ SKIPPED ROW with code "${code}" - Empty country name`);
-        skippedEmptyName++;
         return;
       }
       
-      if (code && name && !uniqueCountries.has(code)) {
-        uniqueCountries.set(code, {
-          code: code,
-          name: name,
-          language: row.Language || 'English'
-        });
-      } else if (code && name && uniqueCountries.has(code)) {
-        // LOG DUPLICATE ENTRIES
-        console.log(`⚠️ DUPLICATE COUNTRY CODE "${code}": ${name} (${row.Language}) - SKIPPED (already have ${uniqueCountries.get(code).name})`);
+      // Handle duplicate country codes by appending language suffix
+      let finalCode = code;
+      if (countryCodes.has(code)) {
+        // Extract language code from language string
+        const langAbbr = language.substring(0, 2).toUpperCase();
+        finalCode = `${code}-${langAbbr}`;
+        console.log(`✅ Multi-language country: ${name} (${language}) → Code: ${finalCode}`);
       }
+      
+      countryCodes.add(code);
+      
+      countries.push({
+        code: finalCode,
+        name: name,
+        language: language
+      });
     });
     
-    const countries = Array.from(uniqueCountries.values());
-    console.log(`📋 getCountries(): Found ${countries.length} unique countries (skipped ${skippedEmptyName} rows with empty names)`);
+    console.log(`📋 getCountries(): Found ${countries.length} countries (including multi-language variants)`);
     return countries;
   }
 

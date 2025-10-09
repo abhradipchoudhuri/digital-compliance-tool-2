@@ -153,6 +153,7 @@ export class ExcelService {
   /**
    * Get countries from CountryLanguage sheet
    * YOUR EXCEL COLUMNS: 'Abbv', 'Country', 'Language'
+   * FIXED: Handles empty Abbv codes by generating them
    */
   getCountries() {
     if (!this.data || !this.data['CountryLanguage']) {
@@ -163,14 +164,25 @@ export class ExcelService {
     const uniqueCountries = new Map();
     
     this.data['CountryLanguage'].forEach(row => {
-      // YOUR EXCEL has 'Abbv' for country code, 'Country' for name
-      const code = row.Abbv || row.CountryCode || row['Country Code'];
+      let code = row.Abbv || row.CountryCode || row['Country Code'];
       const name = row.Country || row.CountryName || row['Country Name'];
       
-      if (code && !uniqueCountries.has(code)) {
+      // Handle empty codes: generate from country name
+      if (!code || code.trim() === '') {
+        // Special case for United States (Brown-Forman default market)
+        if (name && name.toLowerCase().includes('united states')) {
+          code = 'US';
+        } 
+        // Generate code from first 2 letters of country name
+        else if (name) {
+          code = name.substring(0, 2).toUpperCase();
+        }
+      }
+      
+      if (code && name && !uniqueCountries.has(code)) {
         uniqueCountries.set(code, {
           code: code,
-          name: name || code,
+          name: name,
           language: row.Language || 'English'
         });
       }

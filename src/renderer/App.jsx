@@ -9,15 +9,18 @@ const App = () => {
   const { brands: rawBrands = [], countries: rawCountries = [], assetTypes: rawAssetTypes = [], loading, error } = useExcelData();
   
   // DEBUG: Log to find US
-  console.log('Total countries:', rawCountries.length);
-  console.log('First 5 countries:', rawCountries.slice(0, 5));
-  console.log('Looking for US:', rawCountries.filter(c => 
-    c.code === 'US' || 
-    c.code === 'USA' || 
-    c.name.includes('United States') ||
-    c.name.includes('United')
-  ));
-  console.log('All country codes:', rawCountries.map(c => c.code).sort());
+console.log('Total countries:', rawCountries.length);
+console.log('First 5 countries:', rawCountries.slice(0, 5));
+const usEntries = rawCountries.filter(c => 
+  c.code === 'US' || 
+  c.code === 'USA' || 
+  c.name.includes('United States') ||
+  c.name.includes('United')
+);
+console.log('Looking for US:', usEntries);
+console.log('US Details:', JSON.stringify(usEntries, null, 2));
+console.log('All country codes:', rawCountries.map(c => c.code).sort());
+console.log('Countries with empty/null names:', rawCountries.filter(c => !c.name || c.name.trim() === ''));
   
   // Form state
   const [selectedAssetType, setSelectedAssetType] = useState('');

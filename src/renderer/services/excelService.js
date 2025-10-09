@@ -162,6 +162,7 @@ export class ExcelService {
     }
     
     const uniqueCountries = new Map();
+    let skippedEmptyName = 0;
     
     this.data['CountryLanguage'].forEach(row => {
       let code = row.Abbv || row.CountryCode || row['Country Code'];
@@ -179,6 +180,13 @@ export class ExcelService {
         }
       }
       
+      // Check if country name is empty
+      if (!name || name.trim() === '') {
+        console.log(`⚠️ SKIPPED ROW with code "${code}" - Empty country name`);
+        skippedEmptyName++;
+        return;
+      }
+      
       if (code && name && !uniqueCountries.has(code)) {
         uniqueCountries.set(code, {
           code: code,
@@ -192,7 +200,7 @@ export class ExcelService {
     });
     
     const countries = Array.from(uniqueCountries.values());
-    console.log(`📋 getCountries(): Found ${countries.length} unique countries`);
+    console.log(`📋 getCountries(): Found ${countries.length} unique countries (skipped ${skippedEmptyName} rows with empty names)`);
     return countries;
   }
 

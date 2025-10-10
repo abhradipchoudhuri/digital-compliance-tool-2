@@ -4,8 +4,6 @@ import PropTypes from 'prop-types';
 import { useExcelData } from './hooks/useDataLoader';
 import templateService from './services/templateService';
 import { ChevronDown, Search, Check, Copy, Download, History, AlertCircle, Info } from 'lucide-react';
-// Import logo with relative path
-//import brownFormanLogo from '../assets/images/brown-forman-logo.svg';
 
 const App = () => {
   // Get data from Excel hook
@@ -155,10 +153,10 @@ const App = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 via-amber-50/20 to-gray-50 flex items-center justify-center">
         <div className="text-center">
           <div className="w-16 h-16 border-4 border-amber-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading Excel data...</p>
+          <p className="text-gray-600 font-medium">Loading Excel data...</p>
         </div>
       </div>
     );
@@ -166,7 +164,7 @@ const App = () => {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 via-amber-50/20 to-gray-50 flex items-center justify-center">
         <div className="bg-red-50 border border-red-200 rounded-lg p-6 max-w-md">
           <h2 className="text-red-800 font-semibold mb-2">Error Loading Data</h2>
           <p className="text-red-600">{error}</p>
@@ -176,60 +174,92 @@ const App = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header - Option B: Subtle Brown Accent */}
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-amber-50/20 to-gray-50">
+      {/* Header */}
       <header className="bg-gradient-to-b from-gray-50 to-white border-b-2 border-amber-600 shadow-sm">
-  <div className="container mx-auto px-6 py-8">
-    <div className="flex flex-col items-center text-center">
-      {/* Title - Larger and Bolder */}
-      <h1 className="text-3xl font-bold text-gray-800 mb-2">
-        Legal Copy Generator
-      </h1>
-      
-      {/* Subtitle */}
-      <p className="text-base text-amber-700 font-medium">
-        Brown-Forman Corporation
-      </p>
-    </div>
-  </div>
-</header>
+        <div className="container mx-auto px-6 py-8">
+          <div className="flex flex-col items-center text-center">
+            {/* Title - Larger and Bolder */}
+            <h1 className="text-3xl font-bold text-gray-800 mb-2">
+              Legal Copy Generator
+            </h1>
+            
+            {/* Subtitle */}
+            <p className="text-base text-amber-700 font-medium">
+              Brown-Forman Corporation
+            </p>
+          </div>
+        </div>
+      </header>
 
       <div className="container mx-auto px-6 py-8">
         <div className="max-w-6xl mx-auto">
-          {/* Instructions Panel */}
-          <div className="bg-blue-50 border border-blue-200 rounded-xl p-6 mb-8">
-            <h2 className="text-lg font-semibold text-blue-900 mb-3 flex items-center gap-2">
-              <Info size={20} />
+          {/* Instructions Panel - Enhanced Layout */}
+          <div className="bg-gradient-to-br from-blue-50 via-white to-amber-50/30 border border-blue-200 rounded-xl p-6 mb-8 shadow-sm">
+            <h2 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
+              <div className="w-8 h-8 bg-amber-600 rounded-lg flex items-center justify-center">
+                <Info size={18} className="text-white" />
+              </div>
               Instructions
             </h2>
-            <div className="text-blue-800 space-y-2 text-sm">
-              <p><strong>1.</strong> Select your Asset Type</p>
-              <p><strong>2.</strong> Select your Country</p>
-              <p><strong>3.</strong> Select the brand(s) associated with your asset</p>
-              <p><strong>4.</strong> Click Generate</p>
-              <p><strong>5.</strong> Copy the generated text to your clipboard</p>
+            <div className="grid md:grid-cols-2 gap-6">
+              {/* Left Column - Steps 1-3 */}
+              <div className="space-y-3">
+                <div className="flex items-start gap-3">
+                  <div className="w-7 h-7 bg-amber-600 text-white rounded-full flex items-center justify-center font-semibold text-sm flex-shrink-0">1</div>
+                  <p className="text-gray-700 pt-0.5">Select your Asset Type</p>
+                </div>
+                <div className="flex items-start gap-3">
+                  <div className="w-7 h-7 bg-amber-600 text-white rounded-full flex items-center justify-center font-semibold text-sm flex-shrink-0">2</div>
+                  <p className="text-gray-700 pt-0.5">Select your Country</p>
+                </div>
+                <div className="flex items-start gap-3">
+                  <div className="w-7 h-7 bg-amber-600 text-white rounded-full flex items-center justify-center font-semibold text-sm flex-shrink-0">3</div>
+                  <p className="text-gray-700 pt-0.5">Select the brand(s) associated with your asset</p>
+                </div>
+              </div>
+              
+              {/* Right Column - Steps 4-5 */}
+              <div className="space-y-3">
+                <div className="flex items-start gap-3">
+                  <div className="w-7 h-7 bg-amber-600 text-white rounded-full flex items-center justify-center font-semibold text-sm flex-shrink-0">4</div>
+                  <p className="text-gray-700 pt-0.5">Click Generate</p>
+                </div>
+                <div className="flex items-start gap-3">
+                  <div className="w-7 h-7 bg-amber-600 text-white rounded-full flex items-center justify-center font-semibold text-sm flex-shrink-0">5</div>
+                  <p className="text-gray-700 pt-0.5">Copy the generated text to your clipboard</p>
+                </div>
+              </div>
             </div>
           </div>
 
-          {/* Additional Notes */}
+          {/* Additional Notes - Enhanced Cards */}
           <div className="grid md:grid-cols-2 gap-4 mb-8">
-            <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-              <h3 className="font-semibold text-green-800 mb-2 flex items-center gap-2">
-                <span className="w-2 h-2 bg-green-500 rounded-full"></span>
-                Country/Market Specifics
-              </h3>
-              <p className="text-green-700 text-sm">
-                There will be additional detailed instructions included with your copy if your market has local requirements.
+            <div className="bg-gradient-to-br from-green-50 to-emerald-50/50 border border-green-300 rounded-xl p-5 shadow-sm hover:shadow-md transition-shadow duration-200">
+              <div className="flex items-center gap-3 mb-3">
+                <div className="w-10 h-10 bg-green-600 rounded-lg flex items-center justify-center flex-shrink-0">
+                  <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </div>
+                <h3 className="font-semibold text-green-900 text-base">Country/Market Specifics</h3>
+              </div>
+              <p className="text-green-800 text-sm leading-relaxed">
+                Additional detailed instructions will be included with your copy if your market has local requirements.
               </p>
             </div>
             
-            <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
-              <h3 className="font-semibold text-amber-800 mb-2 flex items-center gap-2">
-                <span className="w-2 h-2 bg-amber-500 rounded-full"></span>
-                Multi-Brands
-              </h3>
-              <p className="text-amber-700 text-sm">
-                If you need copy for a multi-brand item, please DO NOT select any other single brands.
+            <div className="bg-gradient-to-br from-amber-50 to-orange-50/50 border border-amber-300 rounded-xl p-5 shadow-sm hover:shadow-md transition-shadow duration-200">
+              <div className="flex items-center gap-3 mb-3">
+                <div className="w-10 h-10 bg-amber-600 rounded-lg flex items-center justify-center flex-shrink-0">
+                  <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+                  </svg>
+                </div>
+                <h3 className="font-semibold text-amber-900 text-base">Multi-Brand Assets</h3>
+              </div>
+              <p className="text-amber-800 text-sm leading-relaxed">
+                For multi-brand items (e.g., Bar-Fabric), please DO NOT select any other single brands as the copy will not generate correctly.
               </p>
             </div>
           </div>
@@ -257,12 +287,15 @@ const App = () => {
             </div>
           )}
 
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8">
+          <div className="bg-gradient-to-br from-amber-50/40 via-white to-amber-50/20 rounded-xl shadow-md border border-amber-200/50 p-8 backdrop-blur-sm">
             {/* Form Section */}
             <div className="space-y-8">
               {/* Asset Type Selector */}
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-3">
+                <label className="block text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+                  <svg className="w-4 h-4 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01" />
+                  </svg>
                   Please select the Asset Type*
                 </label>
                 <div className="relative">
@@ -284,7 +317,10 @@ const App = () => {
 
               {/* Country Selector */}
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-3">
+                <label className="block text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+                  <svg className="w-4 h-4 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
                   Please select the Country*
                 </label>
                 <div className="relative">
@@ -306,7 +342,10 @@ const App = () => {
 
               {/* Brand Selector */}
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-3">
+                <label className="block text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+                  <svg className="w-4 h-4 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+                  </svg>
                   Please select the Brands (Check all that apply)*
                 </label>
                 
@@ -323,12 +362,12 @@ const App = () => {
                 </div>
 
                 {/* Brand Grid */}
-                <div className="border border-gray-300 rounded-lg p-4 max-h-80 overflow-y-auto">
+                <div className="border border-gray-300 rounded-lg p-4 max-h-80 overflow-y-auto bg-white">
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                     {filteredBrands.map((brand) => (
                       <label
                         key={brand.id}
-                        className="flex items-center gap-3 p-3 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors duration-200 group"
+                        className="flex items-center gap-3 p-3 rounded-lg hover:bg-amber-50 cursor-pointer transition-colors duration-200 group"
                       >
                         <input
                           type="checkbox"
@@ -366,7 +405,7 @@ const App = () => {
                 <button
                   onClick={handleGenerate}
                   disabled={isGenerating}
-                  className="px-8 py-4 bg-amber-700 hover:bg-amber-800 disabled:bg-gray-400 text-white font-semibold rounded-lg transition-all duration-200 transform hover:scale-105 disabled:transform-none shadow-lg hover:shadow-xl"
+                  className="px-10 py-4 bg-gradient-to-r from-amber-700 to-amber-600 hover:from-amber-800 hover:to-amber-700 disabled:bg-gray-400 text-white font-bold rounded-xl transition-all duration-300 transform hover:scale-105 hover:-translate-y-0.5 disabled:transform-none shadow-lg hover:shadow-2xl active:scale-95"
                 >
                   {isGenerating ? (
                     <span className="flex items-center gap-2">
@@ -384,13 +423,13 @@ const App = () => {
             {generatedCopy && (
               <div id="generated-copy-section" className="mt-12 border-t border-gray-200 pt-8">
                 <h3 className="text-xl font-semibold text-gray-900 mb-6 flex items-center gap-2">
-                  <span className="w-3 h-3 bg-green-500 rounded-full"></span>
+                  <span className="w-3 h-3 bg-green-500 rounded-full animate-pulse"></span>
                   Generated Legal Copy
                 </h3>
                 
                 {/* Metadata */}
                 {generatedCopy.metadata && (
-                  <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-4 text-sm">
+                  <div className="bg-gradient-to-br from-amber-50 to-orange-50/50 border border-amber-200 rounded-lg p-4 mb-4 text-sm">
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                       <div>
                         <span className="font-semibold text-amber-900">Asset Type:</span>
@@ -412,15 +451,15 @@ const App = () => {
                   </div>
                 )}
                 
-                <div className="bg-gray-50 border border-gray-200 rounded-lg p-6">
+                <div className="bg-white border border-gray-200 rounded-lg p-6 shadow-sm">
                   <div className="prose prose-sm max-w-none">
                     <div dangerouslySetInnerHTML={{ __html: generatedCopy.html }} />
                   </div>
                   
-                  <div className="flex gap-3 mt-6 pt-6 border-t border-gray-300">
+                  <div className="flex flex-wrap gap-3 mt-6 pt-6 border-t border-gray-300">
                     <button
                       onClick={handleCopyAndClose}
-                      className="flex items-center gap-2 px-4 py-2 bg-amber-700 hover:bg-amber-800 text-white rounded-lg transition-colors duration-200"
+                      className="flex items-center gap-2 px-5 py-2.5 bg-amber-700 hover:bg-amber-800 text-white rounded-lg transition-all duration-200 shadow-md hover:shadow-lg transform hover:-translate-y-0.5"
                     >
                       <Copy size={16} />
                       Copy & Close
@@ -436,7 +475,7 @@ const App = () => {
                         element.click();
                         document.body.removeChild(element);
                       }}
-                      className="flex items-center gap-2 px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg transition-colors duration-200"
+                      className="flex items-center gap-2 px-5 py-2.5 bg-gray-600 hover:bg-gray-700 text-white rounded-lg transition-all duration-200 shadow-md hover:shadow-lg transform hover:-translate-y-0.5"
                     >
                       <Download size={16} />
                       Download
@@ -444,7 +483,7 @@ const App = () => {
                     
                     <button
                       onClick={() => copyToClipboard(generatedCopy.plainText)}
-                      className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors duration-200"
+                      className="flex items-center gap-2 px-5 py-2.5 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-all duration-200 shadow-md hover:shadow-lg transform hover:-translate-y-0.5"
                     >
                       <Copy size={16} />
                       Copy Plain Text
@@ -457,7 +496,7 @@ const App = () => {
 
           {/* Development Info */}
           {process.env.NODE_ENV === 'development' && (
-            <div className="mt-8 bg-gray-100 border rounded-lg p-4">
+            <div className="mt-8 bg-white/80 backdrop-blur-sm border border-gray-200 rounded-lg p-4 shadow-sm">
               <h4 className="text-sm font-medium text-gray-700 mb-2">Development Status</h4>
               <div className="text-xs text-gray-600 space-y-1">
                 <div>✅ Brands loaded: {brands.length}</div>

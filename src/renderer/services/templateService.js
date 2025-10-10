@@ -19,18 +19,20 @@ class TemplateService {
       }
 
       console.log('TemplateService: Initializing with Excel data...');
+      console.log('TemplateService: Available sheets:', Object.keys(excelData));
       
       this.excelData = excelData;
       
       // Initialize copy generator with Excel data
+      console.log('TemplateService: Passing data to copyGenerator...');
       copyGenerator.initialize(excelData);
       
       this.isInitialized = true;
-      console.log('TemplateService: Initialization complete');
+      console.log('✅ TemplateService: Initialization complete');
       
       return { success: true };
     } catch (error) {
-      console.error('TemplateService: Initialization error:', error);
+      console.error('❌ TemplateService: Initialization error:', error);
       this.isInitialized = false;
       return { 
         success: false, 
@@ -60,7 +62,7 @@ class TemplateService {
         throw new Error(result.error || 'Copy generation failed');
       }
 
-      console.log('TemplateService: Copy generated successfully');
+      console.log('✅ TemplateService: Copy generated successfully');
 
       return {
         success: true,
@@ -71,7 +73,7 @@ class TemplateService {
       };
 
     } catch (error) {
-      console.error('TemplateService: Generation error:', error);
+      console.error('❌ TemplateService: Generation error:', error);
       return {
         success: false,
         error: error.message
@@ -109,6 +111,7 @@ class TemplateService {
    */
   getAvailableTemplates() {
     if (!this.isInitialized) {
+      console.warn('TemplateService: Not initialized, returning empty templates');
       return [];
     }
 
@@ -123,10 +126,11 @@ class TemplateService {
    */
   getTemplate(assetType, countryCode = 'US') {
     if (!this.isInitialized) {
+      console.warn('TemplateService: Not initialized, cannot get template');
       return null;
     }
 
-    return copyGenerator.getTemplate(assetType, countryCode);
+    return copyGenerator.getAssetTemplate(assetType);
   }
 
   /**
@@ -134,6 +138,7 @@ class TemplateService {
    */
   getAvailableCountries() {
     if (!this.isInitialized) {
+      console.warn('TemplateService: Not initialized, returning empty countries');
       return [];
     }
 
@@ -145,17 +150,11 @@ class TemplateService {
    */
   getAvailableBrands() {
     if (!this.isInitialized || !this.excelData) {
+      console.warn('TemplateService: Not initialized, returning empty brands');
       return [];
     }
 
-    const brandMaster = this.excelData['Brand Master'] || [];
-    
-    return brandMaster.map(brand => ({
-      id: brand['Brand ID'],
-      name: brand['Brand Name'],
-      category: brand['Category'] || 'Uncategorized',
-      status: brand['Status'] || 'Active'
-    })).filter(brand => brand.status === 'Active');
+    return copyGenerator.getAvailableBrands();
   }
 
   /**
@@ -177,17 +176,19 @@ class TemplateService {
    * Format asset type name for display
    */
   formatAssetTypeName(assetType) {
+    // Remove "Digital | " or "Traditional | " prefix for cleaner display
     return assetType
-      .split('_')
-      .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
-      .join(' ');
+      .replace(/^(Digital|Traditional)\s*\|\s*/i, '')
+      .trim();
   }
 
   /**
    * Check if service is ready
    */
   isReady() {
-    return this.isInitialized && copyGenerator.isReady();
+    const ready = this.isInitialized && copyGenerator.isReady();
+    console.log('TemplateService: isReady?', ready);
+    return ready;
   }
 
   /**
@@ -197,6 +198,18 @@ class TemplateService {
     this.isInitialized = false;
     this.excelData = null;
     console.log('TemplateService: Service reset');
+  }
+
+  /**
+   * Get initialization status for debugging
+   */
+  getStatus() {
+    return {
+      isInitialized: this.isInitialized,
+      hasExcelData: !!this.excelData,
+      copyGeneratorReady: copyGenerator.isReady(),
+      availableSheets: this.excelData ? Object.keys(this.excelData) : []
+    };
   }
 }
 

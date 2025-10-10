@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import excelService from '@services/excelService';
+import templateService from '@services/templateService';
 
 export const useDataLoader = () => {
   const [loading, setLoading] = useState(true);
@@ -16,6 +17,19 @@ export const useDataLoader = () => {
       
       setData(loadedData);
       console.log('useDataLoader: Data loaded successfully');
+      console.log('📊 Excel Data Structure:', Object.keys(loadedData));
+      
+      // CRITICAL: Initialize templateService with loaded Excel data
+      console.log('🔧 useDataLoader: Initializing templateService with Excel data...');
+      const initResult = await templateService.initialize(loadedData);
+      
+      if (initResult.success) {
+        console.log('✅ useDataLoader: TemplateService initialized successfully!');
+      } else {
+        console.error('❌ useDataLoader: TemplateService initialization failed:', initResult.error);
+        throw new Error(`Template service initialization failed: ${initResult.error}`);
+      }
+      
     } catch (err) {
       console.error('useDataLoader: Error loading data:', err);
       setError(err.message);
@@ -28,7 +42,13 @@ export const useDataLoader = () => {
     try {
       setError(null);
       await excelService.reload();
-      setData(excelService.getRawData());
+      const reloadedData = excelService.getRawData();
+      setData(reloadedData);
+      
+      // Re-initialize templateService after reload
+      await templateService.initialize(reloadedData);
+      console.log('✅ useDataLoader: Data and templateService reloaded');
+      
     } catch (err) {
       setError(err.message);
     }

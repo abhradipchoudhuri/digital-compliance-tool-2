@@ -1,15 +1,21 @@
 // src/renderer/services/copyGenerator.js
-// Core Copy Generation Engine - Builds legal compliance copy from templates
+// Advanced Copy Generation Engine - Handles placeholder-based template system
 
 /**
- * CopyGenerator - Handles all copy generation logic
- * Processes templates and trademark data to generate compliance copy
+ * CopyGenerator - Processes Excel-based template system with placeholder replacement
+ * Handles complex multi-sheet data structure with language-dependent variables
  */
 class CopyGenerator {
     constructor() {
-      this.trademarkData = null;
-      this.templates = null;
-      this.brandConfig = null;
+      // Main data sheets
+      this.trademarkConfig = null;      // Brand/trademark data
+      this.overallStructure = null;     // Asset type templates
+      this.trademarkStructure = null;   // Trademark format rules
+      this.languageVariables = null;    // Language-specific content
+      this.trademarkLanguage = null;    // Trademark language text
+      this.countryLanguage = null;      // Country-language mappings
+      
+      this.isInitialized = false;
     }
   
     /**
@@ -20,67 +26,105 @@ class CopyGenerator {
         throw new Error('Invalid Excel data provided to CopyGenerator');
       }
   
-      this.trademarkData = excelData['Trademark Config'] || [];
-      this.templates = excelData['Copy Templates'] || [];
-      this.brandConfig = excelData['Brand Master'] || [];
+      console.log('🔧 CopyGenerator: Initializing with Excel data...');
   
-      console.log('CopyGenerator initialized with:', {
-        trademarks: this.trademarkData.length,
-        templates: this.templates.length,
-        brands: this.brandConfig.length
+      // Map Excel sheets to internal data structures
+      this.trademarkConfig = excelData['Trademark Config'] || [];
+      this.overallStructure = excelData['Overall Structure'] || [];
+      this.trademarkStructure = excelData['Trademark Structure'] || [];
+      this.languageVariables = excelData['Language Dependent Variables'] || [];
+      this.trademarkLanguage = excelData['Trademark Language'] || [];
+      this.countryLanguage = excelData['CountryLanguage'] || [];
+  
+      console.log('📊 Loaded sheets:', {
+        trademarkConfig: this.trademarkConfig.length,
+        overallStructure: this.overallStructure.length,
+        trademarkStructure: this.trademarkStructure.length,
+        languageVariables: this.languageVariables.length,
+        trademarkLanguage: this.trademarkLanguage.length,
+        countryLanguage: this.countryLanguage.length
       });
   
       this.validateData();
+      this.isInitialized = true;
+      
+      console.log('✅ CopyGenerator: Initialization complete');
     }
   
     /**
      * Validate that required data is present
      */
     validateData() {
-      if (!this.trademarkData || this.trademarkData.length === 0) {
+      if (!this.trademarkConfig || this.trademarkConfig.length === 0) {
         throw new Error('Trademark Config sheet is empty or missing');
       }
-      if (!this.templates || this.templates.length === 0) {
-        throw new Error('Copy Templates sheet is empty or missing');
+      if (!this.overallStructure || this.overallStructure.length === 0) {
+        throw new Error('Overall Structure sheet is empty or missing');
       }
-      if (!this.brandConfig || this.brandConfig.length === 0) {
-        throw new Error('Brand Master sheet is empty or missing');
+      if (!this.trademarkStructure || this.trademarkStructure.length === 0) {
+        throw new Error('Trademark Structure sheet is empty or missing');
+      }
+      if (!this.languageVariables || this.languageVariables.length === 0) {
+        throw new Error('Language Dependent Variables sheet is empty or missing');
       }
     }
   
     /**
      * Main copy generation function
-     * @param {Object} params - Generation parameters
+     * @param {Object} params - { assetType, countryCode, brandIds }
      * @returns {Object} Generated copy with metadata
      */
     generateCopy(params) {
       const startTime = Date.now();
   
       try {
+        console.log('🎯 CopyGenerator: Starting generation...', params);
+  
         // Validate parameters
         this.validateParams(params);
   
         const { assetType, countryCode, brandIds } = params;
   
-        console.log('Generating copy for:', { assetType, countryCode, brandIds });
-  
-        // Get template for asset type
-        const template = this.getTemplate(assetType, countryCode);
+        // Step 1: Get the template structure for this asset type
+        const template = this.getAssetTemplate(assetType);
         if (!template) {
           throw new Error(`No template found for asset type: ${assetType}`);
         }
   
-        // Get trademark data for each brand
-        const brandTrademarks = this.getBrandTrademarks(brandIds, countryCode);
-        if (brandTrademarks.length === 0) {
-          throw new Error(`No trademark data found for brands: ${brandIds.join(', ')} in ${countryCode}`);
+        console.log('📋 Template found:', template['Asset Type']);
+        console.log('📝 Template structure:', template.Structure);
+  
+        // Step 2: Get language for this country
+        const language = this.getLanguageForCountry(countryCode);
+        console.log('🌍 Language for country:', { countryCode, language });
+  
+        // Step 3: Get language-dependent variables
+        const langVars = this.getLanguageVariables(language);
+        if (!langVars) {
+          throw new Error(`No language variables found for: ${language}`);
         }
   
-        // Build the copy
-        const generatedCopy = this.buildCopy(template, brandTrademarks);
+        // Step 4: Get brand data for each selected brand
+        const brandDataList = this.getBrandData(brandIds);
+        if (brandDataList.length === 0) {
+          throw new Error(`No brand data found for brands: ${brandIds.join(', ')}`);
+        }
+  
+        console.log('🏷️ Brands found:', brandDataList.map(b => b['Brand Names']));
+  
+        // Step 5: Build the complete copy by replacing all placeholders
+        const generatedCopy = this.buildCopyFromTemplate(
+          template,
+          langVars,
+          brandDataList,
+          countryCode,
+          language
+        );
   
         // Calculate generation time
         const generationTime = Date.now() - startTime;
+  
+        console.log('✅ Copy generation complete!');
   
         return {
           success: true,
@@ -88,16 +132,17 @@ class CopyGenerator {
           metadata: {
             assetType,
             countryCode,
+            language,
             brandCount: brandIds.length,
-            brands: brandTrademarks.map(bt => bt.brandName),
-            templateUsed: template['Template Name'] || assetType,
+            brands: brandDataList.map(b => b['Brand Names']),
+            templateUsed: template['Asset Type'],
             generationTime: `${generationTime}ms`,
             timestamp: new Date().toISOString()
           }
         };
   
       } catch (error) {
-        console.error('Copy generation error:', error);
+        console.error('❌ Copy generation error:', error);
         return {
           success: false,
           error: error.message,
@@ -133,208 +178,308 @@ class CopyGenerator {
     }
   
     /**
-     * Get template for specific asset type and country
+     * Get template for specific asset type
      */
-    getTemplate(assetType, countryCode) {
-      // First try to find country-specific template
-      let template = this.templates.find(t => 
-        t['Asset Type'] === assetType && 
-        t['Country Code'] === countryCode
+    getAssetTemplate(assetType) {
+      return this.overallStructure.find(t => 
+        t['Asset Type'] === assetType
+      );
+    }
+  
+    /**
+     * Get language for a specific country code
+     */
+    getLanguageForCountry(countryCode) {
+      const countryData = this.countryLanguage.find(c => 
+        c['Abbv'] === countryCode
       );
   
-      // If no country-specific template, try global template
-      if (!template) {
-        template = this.templates.find(t => 
-          t['Asset Type'] === assetType && 
-          (!t['Country Code'] || t['Country Code'] === 'GLOBAL' || t['Country Code'] === 'ALL')
-        );
+      if (countryData) {
+        return countryData['Language'];
       }
   
-      if (template) {
-        console.log('Found template:', template['Template Name'] || assetType);
-      } else {
-        console.warn(`No template found for ${assetType} in ${countryCode}`);
-      }
-  
-      return template;
+      // Default to English if not found
+      console.warn(`⚠️ No language found for country ${countryCode}, defaulting to English (Default)`);
+      return 'English (Default)';
     }
   
     /**
-     * Get trademark data for brands in specific country
+     * Get language-dependent variables for a language
      */
-    getBrandTrademarks(brandIds, countryCode) {
-      const brandTrademarks = [];
+    getLanguageVariables(language) {
+      return this.languageVariables.find(lv => 
+        lv['Language'] === language
+      );
+    }
+  
+    /**
+     * Get brand data for multiple brands
+     */
+    getBrandData(brandIds) {
+      const brandDataList = [];
   
       for (const brandId of brandIds) {
-        // Find brand info
-        const brandInfo = this.brandConfig.find(b => 
-          b['Brand ID'] === brandId || b['Brand Name'] === brandId
+        const brandData = this.trademarkConfig.find(b => 
+          b['Brand Names'] === brandId || 
+          b['Display Names'] === brandId
         );
   
-        if (!brandInfo) {
-          console.warn(`Brand not found: ${brandId}`);
-          continue;
-        }
-  
-        // Find trademark data for this brand and country
-        const trademark = this.trademarkData.find(t => 
-          (t['Brand ID'] === brandId || t['Brand Name'] === brandInfo['Brand Name']) &&
-          t['Country Code'] === countryCode
-        );
-  
-        if (trademark) {
-          brandTrademarks.push({
-            brandId: brandId,
-            brandName: brandInfo['Brand Name'],
-            trademarkSymbol: this.getTrademarkSymbol(trademark),
-            registrationNumber: trademark['Registration Number'] || '',
-            registrationDate: trademark['Registration Date'] || '',
-            status: trademark['Status'] || 'Active'
-          });
+        if (brandData) {
+          brandDataList.push(brandData);
         } else {
-          // If no trademark found, still include brand with default symbol
-          console.warn(`No trademark data for ${brandInfo['Brand Name']} in ${countryCode}, using default`);
-          brandTrademarks.push({
-            brandId: brandId,
-            brandName: brandInfo['Brand Name'],
-            trademarkSymbol: '™', // Default to TM
-            registrationNumber: '',
-            registrationDate: '',
-            status: 'Pending'
-          });
+          console.warn(`⚠️ Brand not found: ${brandId}`);
         }
       }
   
-      return brandTrademarks;
+      return brandDataList;
     }
   
     /**
-     * Determine correct trademark symbol based on status
+     * Build complete copy by replacing all placeholders in template
      */
-    getTrademarkSymbol(trademark) {
-      const status = (trademark['Status'] || '').toLowerCase();
-      const symbol = trademark['Symbol'] || '';
+    buildCopyFromTemplate(template, langVars, brandDataList, countryCode, language) {
+      let copyText = template.Structure || '';
   
-      // If symbol is explicitly provided, use it
-      if (symbol) {
-        return symbol;
+      console.log('🔨 Building copy from template...');
+      console.log('📝 Original template:', copyText);
+  
+      // Replace <<Responsibility Language>>
+      if (copyText.includes('<<Responsibility Language>>')) {
+        const respLang = langVars['Responsibility Language '] || langVars['Responsibility Language'] || '';
+        copyText = copyText.replace(/<<Responsibility Language>>/g, respLang);
+        console.log('✅ Replaced: Responsibility Language');
       }
   
-      // Determine symbol based on status
-      if (status.includes('registered') || status === 'active') {
-        return '®';
-      } else if (status.includes('pending') || status.includes('applied')) {
-        return '™';
-      } else {
-        return '™'; // Default to TM
-      }
-    }
-  
-    /**
-     * Build final copy from template and trademark data
-     */
-    buildCopy(template, brandTrademarks) {
-      let copyText = template['Copy Template'] || template['Template Text'] || '';
-  
-      if (!copyText) {
-        throw new Error('Template has no copy text');
+      // Replace <<TTB>> - TTB mandatory statement (leave placeholder for US teams)
+      if (copyText.includes('<<TTB>>')) {
+        if (countryCode === 'US') {
+          copyText = copyText.replace(/<<TTB>>/g, '<br><span style="color: red; font-weight: bold;">[INSERT TTB MANDATORY STATEMENT HERE]</span><br>');
+          console.log('✅ Replaced: TTB (US placeholder)');
+        } else {
+          copyText = copyText.replace(/<<TTB>>/g, '');
+          console.log('✅ Removed: TTB (non-US)');
+        }
       }
   
-      console.log('Building copy with template:', copyText.substring(0, 100) + '...');
-  
-      // Handle single brand
-      if (brandTrademarks.length === 1) {
-        const brand = brandTrademarks[0];
-        copyText = this.replacePlaceholders(copyText, {
-          brandName: brand.brandName,
-          symbol: brand.trademarkSymbol
-        });
-      } 
-      // Handle multiple brands
-      else {
-        copyText = this.replaceMultiBrandPlaceholders(copyText, brandTrademarks);
+      // Replace <<Trademark>> - Build trademark section for all brands
+      if (copyText.includes('<<Trademark>>')) {
+        const trademarkSection = this.buildTrademarkSection(brandDataList, language);
+        copyText = copyText.replace(/<<Trademark>>/g, trademarkSection);
+        console.log('✅ Replaced: Trademark');
       }
+  
+      // Replace <<Forward Notice>>
+      if (copyText.includes('<<Forward Notice>>')) {
+        const forwardNotice = this.getForwardNotice(brandDataList, langVars);
+        copyText = copyText.replace(/<<Forward Notice>>/g, forwardNotice);
+        console.log('✅ Replaced: Forward Notice');
+      }
+  
+      // Replace <<All Other Trademarks>>
+      if (copyText.includes('<<All Other Trademarks>>')) {
+        const allOtherTM = langVars['All Other Trademarks'] || '';
+        copyText = copyText.replace(/<<All Other Trademarks>>/g, allOtherTM);
+        console.log('✅ Replaced: All Other Trademarks');
+      }
+  
+      // Replace <<Responsibility Site>>
+      if (copyText.includes('<<Responsibility Site>>')) {
+        const respSite = langVars['Responsibility Site'] || '';
+        copyText = copyText.replace(/<<Responsibility Site>>/g, respSite);
+        console.log('✅ Replaced: Responsibility Site');
+      }
+  
+      // Replace <<Legal Documents>> (Website)
+      if (copyText.includes('<<Legal Documents>>')) {
+        const legalDocs = langVars['Website Legal Documents'] || '';
+        copyText = copyText.replace(/<<Legal Documents>>/g, legalDocs);
+        console.log('✅ Replaced: Legal Documents');
+      }
+  
+      // Replace <<Email Sent By>>
+      if (copyText.includes('<<Email Sent By>>')) {
+        const emailSentBy = langVars['Email Sent By Statement'] || '';
+        copyText = copyText.replace(/<<Email Sent By>>/g, emailSentBy);
+        console.log('✅ Replaced: Email Sent By');
+      }
+  
+      // Replace <<Email Legal Documents>>
+      if (copyText.includes('<<Email Legal Documents>>')) {
+        const emailLegalDocs = langVars['Email Legal Documents'] || '';
+        copyText = copyText.replace(/<<Email Legal Documents>>/g, emailLegalDocs);
+        console.log('✅ Replaced: Email Legal Documents');
+      }
+  
+      // Replace <<Email Header>>
+      if (copyText.includes('<<Email Header>>')) {
+        const emailHeader = langVars['Email Header'] || '';
+        copyText = copyText.replace(/<<Email Header>>/g, emailHeader);
+        console.log('✅ Replaced: Email Header');
+      }
+  
+      // Replace <<UGC Policy>>
+      if (copyText.includes('<<UGC Policy>>')) {
+        const ugcPolicy = langVars['UGC Policy'] || '';
+        copyText = copyText.replace(/<<UGC Policy>>/g, ugcPolicy);
+        console.log('✅ Replaced: UGC Policy');
+      }
+  
+      // Replace <<Age-Gate Statement>>
+      if (copyText.includes('<<Age-Gate Statement>>')) {
+        const ageGate = langVars['Age-Gate Statement'] || '';
+        copyText = copyText.replace(/<<Age-Gate Statement>>/g, ageGate);
+        console.log('✅ Replaced: Age-Gate Statement');
+      }
+  
+      // Replace <<Terms of Use>>
+      if (copyText.includes('<<Terms of Use>>')) {
+        const termsOfUse = langVars['Terms of Use'] || '';
+        copyText = copyText.replace(/<<Terms of Use>>/g, termsOfUse);
+        console.log('✅ Replaced: Terms of Use');
+      }
+  
+      // Replace <<Privacy Policy>>
+      if (copyText.includes('<<Privacy Policy>>')) {
+        const privacyPolicy = langVars['Privacy Policy'] || '';
+        copyText = copyText.replace(/<<Privacy Policy>>/g, privacyPolicy);
+        console.log('✅ Replaced: Privacy Policy');
+      }
+  
+      // Replace <<Cookie Policy>>
+      if (copyText.includes('<<Cookie Policy>>')) {
+        const cookiePolicy = langVars['Cookie Policy'] || '';
+        copyText = copyText.replace(/<<Cookie Policy>>/g, cookiePolicy);
+        console.log('✅ Replaced: Cookie Policy');
+      }
+  
+      // Replace <<Terms Agreement>>
+      if (copyText.includes('<<Terms Agreement>>')) {
+        const termsAgreement = langVars['Terms Agreement'] || '';
+        copyText = copyText.replace(/<<Terms Agreement>>/g, termsAgreement);
+        console.log('✅ Replaced: Terms Agreement');
+      }
+  
+      // Replace <<Email Opt-In Statement>>
+      if (copyText.includes('<<Email Opt-In Statement>>')) {
+        const optIn = langVars['Email Opt-In Statement and Consent Statement'] || '';
+        copyText = copyText.replace(/<<Email Opt-In Statement>>/g, optIn);
+        console.log('✅ Replaced: Email Opt-In Statement');
+      }
+  
+      // Replace <<Abbreviated Privacy Policy>>
+      if (copyText.includes('<<Abbreviated Privacy Policy>>')) {
+        const abbrevPrivacy = langVars['Abbreviated Privacy Policy'] || '';
+        copyText = copyText.replace(/<<Abbreviated Privacy Policy>>/g, abbrevPrivacy);
+        console.log('✅ Replaced: Abbreviated Privacy Policy');
+      }
+  
+      console.log('📝 Final copy (first 200 chars):', copyText.substring(0, 200));
   
       // Generate both HTML and plain text versions
-      const htmlCopy = this.generateHtmlCopy(copyText, brandTrademarks);
+      const htmlCopy = this.formatAsHtml(copyText);
       const plainText = this.stripHtml(htmlCopy);
   
       return {
         html: htmlCopy,
         plainText: plainText,
+        rawTemplate: copyText,
         characterCount: plainText.length,
-        wordCount: this.countWords(plainText),
-        brands: brandTrademarks.map(bt => ({
-          name: bt.brandName,
-          symbol: bt.trademarkSymbol
-        }))
+        wordCount: this.countWords(plainText)
       };
     }
   
     /**
-     * Replace placeholders in template
+     * Build trademark section for all brands
      */
-    replacePlaceholders(text, data) {
-      let result = text;
+    buildTrademarkSection(brandDataList, language) {
+      const currentYear = new Date().getFullYear();
+      const trademarkParts = [];
   
-      // Replace {BRAND_NAME} with brand name
-      result = result.replace(/\{BRAND_NAME\}/g, data.brandName);
+      // Get trademark language data for this language
+      const tmLangData = this.trademarkLanguage.find(tl => 
+        tl['Language'] === language
+      );
   
-      // Replace {BRAND} with brand name
-      result = result.replace(/\{BRAND\}/g, data.brandName);
-  
-      // Replace {SYMBOL} or {TM} with trademark symbol
-      result = result.replace(/\{SYMBOL\}/g, data.symbol);
-      result = result.replace(/\{TM\}/g, data.symbol);
-  
-      return result;
-    }
-  
-    /**
-     * Replace placeholders for multiple brands
-     */
-    replaceMultiBrandPlaceholders(text, brandTrademarks) {
-      let result = text;
-  
-      // Build brand list string
-      const brandList = brandTrademarks
-        .map(bt => `${bt.brandName}${bt.trademarkSymbol}`)
-        .join(', ');
-  
-      // Replace {BRAND_LIST}
-      result = result.replace(/\{BRAND_LIST\}/g, brandList);
-  
-      // If template has {BRAND_NAME}, use first brand
-      if (result.includes('{BRAND_NAME}') && brandTrademarks.length > 0) {
-        result = result.replace(/\{BRAND_NAME\}/g, brandTrademarks[0].brandName);
-        result = result.replace(/\{SYMBOL\}/g, brandTrademarks[0].trademarkSymbol);
-      }
-  
-      return result;
-    }
-  
-    /**
-     * Generate HTML formatted copy
-     */
-    generateHtmlCopy(text, brandTrademarks) {
-      let html = text;
-  
-      // Wrap brand names with trademark symbols in spans
-      brandTrademarks.forEach(bt => {
-        const brandWithSymbol = `${bt.brandName}${bt.trademarkSymbol}`;
-        const regex = new RegExp(brandWithSymbol.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g');
-        html = html.replace(
-          regex,
-          `<span class="brand-trademark">${bt.brandName}<sup>${bt.trademarkSymbol}</sup></span>`
+      for (const brandData of brandDataList) {
+        const trademarkType = brandData['Trademark Type'] || 'Full';
+        
+        // Get the trademark structure template
+        const tmStructure = this.trademarkStructure.find(ts => 
+          ts['Type of Trademark'] === trademarkType
         );
-      });
   
-      // Wrap in paragraph tags if not already
-      if (!html.startsWith('<p>')) {
-        html = `<p>${html}</p>`;
+        if (!tmStructure) {
+          console.warn(`⚠️ No trademark structure found for type: ${trademarkType}`);
+          continue;
+        }
+  
+        let tmText = tmStructure.Structure || '';
+  
+        // Replace brand-specific placeholders
+        tmText = tmText.replace(/<<Brand>>/g, brandData['Brand Names'] || brandData['Display Names']);
+        tmText = tmText.replace(/<<Entity>>/g, brandData['Entity Names'] || '');
+        tmText = tmText.replace(/<<Year>>/g, currentYear.toString());
+  
+        // Replace <<Pre-Brand>> if exists (empty by default)
+        tmText = tmText.replace(/<<Pre-Brand>>/g, '');
+  
+        // Replace <<Registered Language>>
+        if (tmLangData && tmLangData['Registered Language']) {
+          const registeredLang = tmLangData['Registered Language'];
+          // Add trademark symbol before registered language
+          const brandName = brandData['Brand Names'] || brandData['Display Names'];
+          tmText = tmText.replace(/<<Registered Language>>/g, `® ${registeredLang}`);
+          // Also mark the brand with ®
+          tmText = tmText.replace(brandName, `${brandName}®`);
+        } else {
+          tmText = tmText.replace(/<<Registered Language>>/g, '');
+        }
+  
+        // Replace <<Reserve Language>>
+        if (tmLangData && tmLangData['Reserve Language ']) {
+          tmText = tmText.replace(/<<Reserve Language>>/g, tmLangData['Reserve Language '] || '');
+        } else {
+          tmText = tmText.replace(/<<Reserve Language>>/g, '');
+        }
+  
+        trademarkParts.push(tmText.trim());
       }
   
-      return html;
+      return trademarkParts.join(' ');
+    }
+  
+    /**
+     * Get forward notice based on brand configuration
+     */
+    getForwardNotice(brandDataList, langVars) {
+      // Check if any brand needs forward notice
+      const needsForwardNotice = brandDataList.some(b => 
+        b['Forward Notice Type'] && b['Forward Notice Type'] !== 'NA'
+      );
+  
+      if (!needsForwardNotice) {
+        return '';
+      }
+  
+      // Get the first brand's forward notice type
+      const forwardNoticeType = brandDataList[0]['Forward Notice Type'];
+  
+      if (forwardNoticeType === 'Full') {
+        return langVars['Forward Notice Full'] || '';
+      } else if (forwardNoticeType === 'Tightened') {
+        return langVars['Forward Notice Tightened'] || '';
+      }
+  
+      return '';
+    }
+  
+    /**
+     * Format copy as HTML
+     */
+    formatAsHtml(text) {
+      // The text already contains <br> tags from the template
+      // Wrap in a div for proper rendering
+      return `<div class="generated-copy">${text}</div>`;
     }
   
     /**
@@ -342,9 +487,14 @@ class CopyGenerator {
      */
     stripHtml(html) {
       return html
-        .replace(/<sup>/g, '')
-        .replace(/<\/sup>/g, '')
+        .replace(/<br\s*\/?>/gi, '\n')
+        .replace(/<\/p>/gi, '\n\n')
         .replace(/<[^>]*>/g, '')
+        .replace(/&nbsp;/g, ' ')
+        .replace(/&amp;/g, '&')
+        .replace(/&lt;/g, '<')
+        .replace(/&gt;/g, '>')
+        .replace(/&quot;/g, '"')
         .trim();
     }
   
@@ -359,39 +509,45 @@ class CopyGenerator {
      * Get available asset types from templates
      */
     getAvailableAssetTypes() {
-      if (!this.templates) return [];
-  
-      const assetTypes = new Set();
-      this.templates.forEach(t => {
-        if (t['Asset Type']) {
-          assetTypes.add(t['Asset Type']);
-        }
-      });
-  
-      return Array.from(assetTypes).sort();
+      if (!this.overallStructure) return [];
+      return this.overallStructure.map(t => t['Asset Type']).filter(Boolean);
     }
   
     /**
-     * Get available countries from trademark data
+     * Get available countries
      */
     getAvailableCountries() {
-      if (!this.trademarkData) return [];
+      if (!this.countryLanguage) return [];
+      
+      return this.countryLanguage
+        .map(c => ({
+          code: c['Abbv'],
+          name: c['Country'],
+          language: c['Language']
+        }))
+        .filter(c => c.code && c.name);
+    }
   
-      const countries = new Set();
-      this.trademarkData.forEach(t => {
-        if (t['Country Code']) {
-          countries.add(t['Country Code']);
-        }
-      });
-  
-      return Array.from(countries).sort();
+    /**
+     * Get available brands
+     */
+    getAvailableBrands() {
+      if (!this.trademarkConfig) return [];
+      
+      return this.trademarkConfig
+        .map(b => ({
+          id: b['Brand Names'],
+          name: b['Display Names'],
+          entity: b['Entity Names']
+        }))
+        .filter(b => b.id && b.name);
     }
   
     /**
      * Check if copy generation is ready
      */
     isReady() {
-      return !!(this.trademarkData && this.templates && this.brandConfig);
+      return this.isInitialized;
     }
   }
   

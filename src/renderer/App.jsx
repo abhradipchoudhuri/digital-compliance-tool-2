@@ -153,7 +153,7 @@ const App = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-50 via-amber-50/20 to-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-gray-50">
         <div className="text-center">
           <div className="w-16 h-16 border-4 border-amber-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
           <p className="text-gray-600 font-medium">Loading Excel data...</p>
@@ -164,7 +164,7 @@ const App = () => {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-50 via-amber-50/20 to-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-gray-50">
         <div className="bg-red-50 border border-red-200 rounded-lg p-6 max-w-md">
           <h2 className="text-red-800 font-semibold mb-2">Error Loading Data</h2>
           <p className="text-red-600">{error}</p>
@@ -174,15 +174,15 @@ const App = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-amber-50/20 to-gray-50">
+    <div className="min-h-screen bg-gray-50">
       {/* Header */}
-      <header className="bg-gray-900 text-white shadow-md">
+      <header className="bg-amber-700 text-white shadow-md">
   <div className="container mx-auto px-6 py-6">
     <div className="flex flex-col items-center text-center">
       <h1 className="text-3xl font-bold mb-1">
         Legal Copy Generator
       </h1>
-      <p className="text-sm text-gray-300">
+      <p className="text-sm text-amber-100">
         Brown-Forman Corporation
       </p>
     </div>

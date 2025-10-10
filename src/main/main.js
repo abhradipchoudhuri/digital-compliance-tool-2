@@ -204,27 +204,28 @@ function setupIPC() {
   // ============================================
   ipcMain.handle('generate-copy', async (event, params) => {
     try {
-      console.log('Generate copy request:', params);
+      console.log('Main Process: Generate copy request received:', params);
       
       // Validate parameters
-      if (!params.assetType || !params.countryCode || !Array.isArray(params.brandIds)) {
+      if (!params || !params.assetType || !params.countryCode || !Array.isArray(params.brandIds)) {
         throw new Error('Invalid parameters for copy generation');
       }
+
+      // The actual copy generation happens in the renderer process
+      // This handler just validates and logs the request
+      // The frontend will call templateService.generateCopy() directly
       
-      // TODO: Implement actual copy generation logic
-      // This is a placeholder that will be implemented in later artifacts
+      console.log('Main Process: Copy generation parameters validated');
       
       return {
         success: true,
+        message: 'Copy generation request acknowledged',
         timestamp: new Date().toISOString(),
-        params: params,
-        generatedCopy: {
-          html: '<p>Generated copy will appear here</p>',
-          plainText: 'Generated copy will appear here'
-        }
+        params: params
       };
+      
     } catch (error) {
-      console.error('Error generating copy:', error);
+      console.error('Main Process: Error in copy generation handler:', error);
       return {
         success: false,
         error: error.message

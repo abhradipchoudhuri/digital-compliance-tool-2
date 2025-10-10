@@ -179,20 +179,15 @@ const App = () => {
     <div className="min-h-screen bg-gray-50">
       {/* Header - Option B: Subtle Brown Accent */}
       <header className="bg-gradient-to-b from-gray-50 to-white border-b-2 border-amber-600 shadow-sm">
-  <div className="container mx-auto px-6 py-6">
+  <div className="container mx-auto px-6 py-8">
     <div className="flex flex-col items-center text-center">
-      {/* Brown-Forman Logo Placeholder */}
-      <div className="w-20 h-20 bg-amber-600 rounded-full flex items-center justify-center font-bold text-white text-2xl mb-4">
-        BF
-      </div>
-      
-      {/* Title */}
-      <h1 className="text-2xl font-semibold text-gray-800 mb-1">
+      {/* Title - Larger and Bolder */}
+      <h1 className="text-3xl font-bold text-gray-800 mb-2">
         Legal Copy Generator
       </h1>
       
       {/* Subtitle */}
-      <p className="text-sm text-amber-700 font-medium">
+      <p className="text-base text-amber-700 font-medium">
         Brown-Forman Corporation
       </p>
     </div>

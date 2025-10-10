@@ -3,7 +3,7 @@
 
 const { app, BrowserWindow, ipcMain } = require('electron');
 const path = require('path');
-const isDev = process.env.NODE_ENV === 'development' || !app.isPackaged;
+const isDev = require('electron-is-dev');
 
 let mainWindow;
 

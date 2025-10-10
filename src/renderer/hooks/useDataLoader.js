@@ -19,9 +19,14 @@ export const useDataLoader = () => {
       console.log('useDataLoader: Data loaded successfully');
       console.log('📊 Excel Data Structure:', Object.keys(loadedData));
       
-      // CRITICAL: Initialize templateService with loaded Excel data
+      // CRITICAL: Extract actual Excel data from the response object
+      // excelService.loadData() returns { success, data, metadata }
+      // We need to pass just the 'data' property to templateService
+      const actualExcelData = loadedData.data || loadedData;
+      console.log('🔍 Actual Excel sheets:', Object.keys(actualExcelData));
+      
       console.log('🔧 useDataLoader: Initializing templateService with Excel data...');
-      const initResult = await templateService.initialize(loadedData);
+      const initResult = await templateService.initialize(actualExcelData);
       
       if (initResult.success) {
         console.log('✅ useDataLoader: TemplateService initialized successfully!');
@@ -45,8 +50,11 @@ export const useDataLoader = () => {
       const reloadedData = excelService.getRawData();
       setData(reloadedData);
       
+      // Extract actual data from response
+      const actualExcelData = reloadedData.data || reloadedData;
+      
       // Re-initialize templateService after reload
-      await templateService.initialize(reloadedData);
+      await templateService.initialize(actualExcelData);
       console.log('✅ useDataLoader: Data and templateService reloaded');
       
     } catch (err) {

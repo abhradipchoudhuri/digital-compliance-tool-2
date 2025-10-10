@@ -1,5 +1,5 @@
 // src/renderer/services/templateService.js
-// Template Service - Manages copy templates and generation
+// Template Service - Manages copy templates and generation logic
 
 import copyGenerator from './copyGenerator';
 

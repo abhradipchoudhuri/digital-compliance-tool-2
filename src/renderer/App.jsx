@@ -4,6 +4,7 @@ import PropTypes from 'prop-types';
 import { useExcelData } from './hooks/useDataLoader';
 import templateService from './services/templateService';
 import { ChevronDown, Search, Check, Copy, Download, History, AlertCircle, Info } from 'lucide-react';
+// Import logo with relative path
 import brownFormanLogo from '../assets/images/brown-forman-logo.svg';
 
 const App = () => {

@@ -4,6 +4,7 @@ import PropTypes from 'prop-types';
 import { useExcelData } from './hooks/useDataLoader';
 import templateService from './services/templateService';
 import { ChevronDown, Search, Check, Copy, Download, History, AlertCircle, Info } from 'lucide-react';
+import brownFormanLogo from '@assets/images/brown-forman-logo.svg';
 
 const App = () => {
   // Get data from Excel hook
@@ -21,9 +22,9 @@ const App = () => {
 
   // Process brands with unique IDs
   const brands = rawBrands.map((brand, index) => ({
-    id: `${brand.id}-${index}`, // Make ID unique by adding index
+    id: `${brand.id}-${index}`,
     name: brand.name,
-    originalId: brand.id, // Keep original ID for template service
+    originalId: brand.id,
     entity: brand.entity
   }));
 
@@ -80,7 +81,6 @@ const App = () => {
       const selectedBrandNames = Array.from(selectedBrands)
         .map(id => {
           const brand = brands.find(b => b.id === id);
-          // Use original brand name from Excel
           return brand?.name;
         })
         .filter(Boolean);
@@ -93,7 +93,7 @@ const App = () => {
       const result = await templateService.generateCopy({
         assetType: selectedAssetType,
         countryCode: selectedCountry,
-        brandIds: selectedBrandNames // Brand names are used as IDs
+        brandIds: selectedBrandNames
       });
       
       console.log('📦 Generation result:', result);
@@ -156,7 +156,7 @@ const App = () => {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
-          <div className="w-16 h-16 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <div className="w-16 h-16 border-4 border-amber-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
           <p className="text-gray-600">Loading Excel data...</p>
         </div>
       </div>
@@ -176,17 +176,26 @@ const App = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="bg-gradient-to-r from-blue-800 to-blue-900 text-white shadow-lg">
-        <div className="container mx-auto px-6 py-4">
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 bg-amber-500 rounded-full flex items-center justify-center font-bold text-blue-900">
-              BF
-            </div>
-            <div>
-              <h1 className="text-2xl font-bold">Digital Compliance Legal Copy Generator</h1>
-              <p className="text-sm text-blue-200">Brown-Forman Corporation</p>
-            </div>
+      {/* Header - Option B: Subtle Brown Accent */}
+      <header className="bg-gradient-to-b from-gray-50 to-white border-b-2 border-amber-600 shadow-sm">
+        <div className="container mx-auto px-6 py-6">
+          <div className="flex flex-col items-center text-center">
+            {/* Brown-Forman Logo */}
+            <img 
+              src={brownFormanLogo}
+              alt="Brown-Forman" 
+              className="h-20 w-auto mb-4"
+            />
+            
+            {/* Title */}
+            <h1 className="text-2xl font-semibold text-gray-800 mb-1">
+              Legal Copy Generator
+            </h1>
+            
+            {/* Subtitle */}
+            <p className="text-sm text-amber-700 font-medium">
+              Brown-Forman Corporation
+            </p>
           </div>
         </div>
       </header>
@@ -266,7 +275,7 @@ const App = () => {
                   <select
                     value={selectedAssetType}
                     onChange={(e) => setSelectedAssetType(e.target.value)}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg appearance-none bg-white text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200"
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg appearance-none bg-white text-gray-900 focus:ring-2 focus:ring-amber-500 focus:border-amber-500 transition-all duration-200"
                   >
                     <option value="">Select Asset Type</option>
                     {assetTypes.map((type) => (
@@ -288,7 +297,7 @@ const App = () => {
                   <select
                     value={selectedCountry}
                     onChange={(e) => setSelectedCountry(e.target.value)}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg appearance-none bg-white text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200"
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg appearance-none bg-white text-gray-900 focus:ring-2 focus:ring-amber-500 focus:border-amber-500 transition-all duration-200"
                   >
                     <option value="">Select Country</option>
                     {countries.map((country) => (
@@ -315,7 +324,7 @@ const App = () => {
                     placeholder="Search brands..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200"
+                    className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-amber-500 transition-all duration-200"
                   />
                 </div>
 
@@ -331,10 +340,10 @@ const App = () => {
                           type="checkbox"
                           checked={selectedBrands.has(brand.id)}
                           onChange={() => handleBrandToggle(brand.id)}
-                          className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 focus:ring-2"
+                          className="w-4 h-4 text-amber-600 bg-gray-100 border-gray-300 rounded focus:ring-amber-500 focus:ring-2"
                         />
                         <div className="flex-1">
-                          <div className="font-medium text-gray-900 text-sm group-hover:text-blue-700 transition-colors">
+                          <div className="font-medium text-gray-900 text-sm group-hover:text-amber-700 transition-colors">
                             {brand.name}
                           </div>
                           {brand.entity && (
@@ -344,7 +353,7 @@ const App = () => {
                           )}
                         </div>
                         {selectedBrands.has(brand.id) && (
-                          <Check className="text-blue-600" size={16} />
+                          <Check className="text-amber-600" size={16} />
                         )}
                       </label>
                     ))}
@@ -363,7 +372,7 @@ const App = () => {
                 <button
                   onClick={handleGenerate}
                   disabled={isGenerating}
-                  className="px-8 py-4 bg-blue-800 hover:bg-blue-900 disabled:bg-gray-400 text-white font-semibold rounded-lg transition-all duration-200 transform hover:scale-105 disabled:transform-none shadow-lg hover:shadow-xl"
+                  className="px-8 py-4 bg-amber-700 hover:bg-amber-800 disabled:bg-gray-400 text-white font-semibold rounded-lg transition-all duration-200 transform hover:scale-105 disabled:transform-none shadow-lg hover:shadow-xl"
                 >
                   {isGenerating ? (
                     <span className="flex items-center gap-2">
@@ -387,23 +396,23 @@ const App = () => {
                 
                 {/* Metadata */}
                 {generatedCopy.metadata && (
-                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4 text-sm">
+                  <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-4 text-sm">
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                       <div>
-                        <span className="font-semibold text-blue-900">Asset Type:</span>
-                        <p className="text-blue-700">{generatedCopy.metadata.assetType}</p>
+                        <span className="font-semibold text-amber-900">Asset Type:</span>
+                        <p className="text-amber-800">{generatedCopy.metadata.assetType}</p>
                       </div>
                       <div>
-                        <span className="font-semibold text-blue-900">Country:</span>
-                        <p className="text-blue-700">{generatedCopy.metadata.countryCode}</p>
+                        <span className="font-semibold text-amber-900">Country:</span>
+                        <p className="text-amber-800">{generatedCopy.metadata.countryCode}</p>
                       </div>
                       <div>
-                        <span className="font-semibold text-blue-900">Language:</span>
-                        <p className="text-blue-700">{generatedCopy.metadata.language}</p>
+                        <span className="font-semibold text-amber-900">Language:</span>
+                        <p className="text-amber-800">{generatedCopy.metadata.language}</p>
                       </div>
                       <div>
-                        <span className="font-semibold text-blue-900">Brands:</span>
-                        <p className="text-blue-700">{generatedCopy.metadata.brands?.join(', ')}</p>
+                        <span className="font-semibold text-amber-900">Brands:</span>
+                        <p className="text-amber-800">{generatedCopy.metadata.brands?.join(', ')}</p>
                       </div>
                     </div>
                   </div>
@@ -417,7 +426,7 @@ const App = () => {
                   <div className="flex gap-3 mt-6 pt-6 border-t border-gray-300">
                     <button
                       onClick={handleCopyAndClose}
-                      className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors duration-200"
+                      className="flex items-center gap-2 px-4 py-2 bg-amber-700 hover:bg-amber-800 text-white rounded-lg transition-colors duration-200"
                     >
                       <Copy size={16} />
                       Copy & Close

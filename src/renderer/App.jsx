@@ -293,7 +293,7 @@ const App = () => {
                     <option value="">Select Country</option>
                     {countries.map((country) => (
                       <option key={country.code} value={country.code}>
-                        {country.name} ({country.language})
+                        {country.name}
                       </option>
                     ))}
                   </select>

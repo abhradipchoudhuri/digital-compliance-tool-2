@@ -1,25 +1,29 @@
 // src/main/main.js
 // Electron Main Process - Complete with ExcelJS Integration
 
-const { app, BrowserWindow, ipcMain, dialog } = require('electron');
+const { app, BrowserWindow, ipcMain } = require('electron');
 const path = require('path');
-const fs = require('fs');
-const ExcelJS = require('exceljs');
+const isDev = require('electron-is-dev');
 
-// Auto-updater (for production builds)
-const { autoUpdater } = require('electron-updater');
-
-// Environment detection
-const isDev = process.env.NODE_ENV === 'development' || !app.isPackaged;
-const isMac = process.platform === 'darwin';
-
-// Keep a global reference of the window object
 let mainWindow;
 
-// Import menu configuration
-const { createMenu } = require('./menu');
+// Handle creating/removing shortcuts on Windows when installing/uninstalling
+if (require('electron-squirrel-startup')) {
+  app.quit();
+}
 
-// Create the main application window
+// Security: Disable navigation to prevent security issues
+app.on('web-contents-created', (event, contents) => {
+  contents.on('will-navigate', (event, navigationUrl) => {
+    const parsedUrl = new URL(navigationUrl);
+    // Only allow navigation to localhost in dev mode
+    if (isDev && parsedUrl.origin === 'http://localhost:3000') {
+      return;
+    }
+    event.preventDefault();
+  });
+});
+
 function createWindow() {
   mainWindow = new BrowserWindow({
     width: 1400,
@@ -35,379 +39,62 @@ function createWindow() {
       contextIsolation: true,
       preload: path.join(__dirname, '../preload/preload.js'),
       sandbox: true,
-      webSecurity: isDev ? false : true,
+      webSecurity: true, // ✅ FIXED: Always enabled, even in dev
+      allowRunningInsecureContent: false, // ✅ FIXED: Never allow insecure content
+      experimentalFeatures: false,
+      enableRemoteModule: false,
+      // Add CSP
+      contentSecurityPolicy: isDev 
+        ? "default-src 'self' 'unsafe-inline' 'unsafe-eval' http://localhost:3000; script-src 'self' 'unsafe-inline' 'unsafe-eval' http://localhost:3000; style-src 'self' 'unsafe-inline' http://localhost:3000; img-src 'self' data: http://localhost:3000;"
+        : "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; frame-src 'none'; object-src 'none';"
     }
   });
 
   // Load the app
+  const startUrl = isDev
+    ? 'http://localhost:3000'
+    : `file://${path.join(__dirname, '../renderer/index.html')}`;
+  
+  mainWindow.loadURL(startUrl);
+
+  // Open DevTools in development
   if (isDev) {
-    mainWindow.loadURL('http://localhost:3000');
     mainWindow.webContents.openDevTools();
-  } else {
-    mainWindow.loadFile(path.join(__dirname, '../..', 'dist', 'index.html'));
   }
 
-  // Show window when ready to prevent visual flash
+  // Show window when ready
   mainWindow.once('ready-to-show', () => {
     mainWindow.show();
-    
-    // Focus on window
-    if (isDev) {
-      mainWindow.webContents.openDevTools();
-    }
   });
 
-  // Handle window closed
+  // Emitted when the window is closed
   mainWindow.on('closed', () => {
     mainWindow = null;
   });
-
-  // Set up security
-  setupSecurity();
-  
-  // Set up IPC handlers
-  setupIPC();
 }
 
-function setupSecurity() {
-  // Prevent new window creation
-  mainWindow.webContents.setWindowOpenHandler(({ url }) => {
-    // Allow only specific URLs or deny all
-    return { action: 'deny' };
-  });
-
-  // Prevent navigation to external URLs
-  mainWindow.webContents.on('will-navigate', (event, navigationUrl) => {
-    const parsedUrl = new URL(navigationUrl);
-    
-    if (parsedUrl.origin !== 'http://localhost:3000' && !navigationUrl.startsWith('file://')) {
-      event.preventDefault();
-    }
-  });
-}
-
-function setupIPC() {
-  // ============================================
-  // EXCEL DATA LOADING WITH EXCELJS PARSING
-  // ============================================
-  ipcMain.handle('load-excel-data', async () => {
-    try {
-      const excelPath = getExcelFilePath();
-      console.log('Loading Excel from:', excelPath);
-      
-      // Verify file exists
-      if (!fs.existsSync(excelPath)) {
-        throw new Error(`Excel file not found at: ${excelPath}`);
-      }
-      
-      // Parse Excel file with ExcelJS
-      const workbook = new ExcelJS.Workbook();
-      await workbook.xlsx.readFile(excelPath);
-      
-      console.log('Excel file loaded, parsing sheets...');
-      
-      // Convert workbook to structured data
-      const parsedData = {};
-      
-      workbook.eachSheet((worksheet, sheetId) => {
-        const sheetName = worksheet.name;
-        const rows = [];
-        
-        // Get headers from first row
-        const headerRow = worksheet.getRow(1);
-        const headers = [];
-        
-        headerRow.eachCell((cell, colNumber) => {
-          // Clean header names - trim whitespace and handle null values
-          const headerValue = cell.value;
-          if (headerValue !== null && headerValue !== undefined) {
-            headers.push(headerValue.toString().trim());
-          } else {
-            headers.push(`Column${colNumber}`);
-          }
-        });
-        
-        console.log(`Sheet "${sheetName}" headers:`, headers);
-        
-        // Process data rows (skip header row)
-        let rowCount = 0;
-        worksheet.eachRow((row, rowNumber) => {
-          if (rowNumber === 1) return; // Skip header row
-          
-          const rowData = {};
-          let hasData = false;
-          
-          row.eachCell({ includeEmpty: false }, (cell, colNumber) => {
-            const header = headers[colNumber - 1];
-            if (header) {
-              // Handle different cell value types
-              let cellValue = cell.value;
-              
-              // Handle rich text
-              if (cellValue && typeof cellValue === 'object' && cellValue.richText) {
-                cellValue = cellValue.richText.map(rt => rt.text).join('');
-              }
-              
-              // Handle formulas
-              if (cellValue && typeof cellValue === 'object' && cellValue.result !== undefined) {
-                cellValue = cellValue.result;
-              }
-              
-              rowData[header] = cellValue;
-              hasData = true;
-            }
-          });
-          
-          // Only add non-empty rows
-          if (hasData && Object.keys(rowData).length > 0) {
-            rows.push(rowData);
-            rowCount++;
-          }
-        });
-        
-        parsedData[sheetName] = rows;
-        console.log(`Parsed sheet "${sheetName}": ${rowCount} rows`);
-      });
-      
-      // Log summary
-      console.log('Excel data parsed successfully with ExcelJS. Sheets:', Object.keys(parsedData));
-      console.log('Total sheets:', Object.keys(parsedData).length);
-      
-      // Log sample data from Trademark Config for debugging
-      if (parsedData['Trademark Config'] && parsedData['Trademark Config'].length > 0) {
-        console.log('Sample Trademark Config row:', parsedData['Trademark Config'][0]);
-      }
-      
-      return {
-        success: true,
-        data: parsedData,
-        filePath: excelPath,
-        sheetCount: Object.keys(parsedData).length,
-        summary: Object.keys(parsedData).map(sheetName => ({
-          name: sheetName,
-          rows: parsedData[sheetName].length
-        }))
-      };
-      
-    } catch (error) {
-      console.error('Error loading Excel data:', error);
-      return {
-        success: false,
-        error: error.message,
-        stack: isDev ? error.stack : undefined
-      };
-    }
-  });
-
-  // ============================================
-  // COPY GENERATION HANDLER
-  // ============================================
-  ipcMain.handle('generate-copy', async (event, params) => {
-    try {
-      console.log('Generate copy request:', params);
-      
-      // Validate parameters
-      if (!params.assetType || !params.countryCode || !Array.isArray(params.brandIds)) {
-        throw new Error('Invalid parameters for copy generation');
-      }
-      
-      // TODO: Implement actual copy generation logic
-      // This is a placeholder that will be implemented in later artifacts
-      
-      return {
-        success: true,
-        timestamp: new Date().toISOString(),
-        params: params,
-        generatedCopy: {
-          html: '<p>Generated copy will appear here</p>',
-          plainText: 'Generated copy will appear here'
-        }
-      };
-    } catch (error) {
-      console.error('Error generating copy:', error);
-      return {
-        success: false,
-        error: error.message
-      };
-    }
-  });
-
-  // ============================================
-  // APP INFO HANDLER
-  // ============================================
-  ipcMain.handle('get-app-info', async () => {
-    return {
-      name: app.getName(),
-      version: app.getVersion(),
-      platform: process.platform,
-      arch: process.arch,
-      electron: process.versions.electron,
-      chrome: process.versions.chrome,
-      node: process.versions.node,
-      isDev: isDev
-    };
-  });
-
-  // ============================================
-  // FILE SAVE DIALOG HANDLER
-  // ============================================
-  ipcMain.handle('save-file-dialog', async (event, options) => {
-    try {
-      const result = await dialog.showSaveDialog(mainWindow, {
-        title: 'Save Generated Copy',
-        defaultPath: path.join(app.getPath('documents'), 'compliance-copy.txt'),
-        filters: [
-          { name: 'Text Files', extensions: ['txt'] },
-          { name: 'HTML Files', extensions: ['html'] },
-          { name: 'All Files', extensions: ['*'] }
-        ],
-        ...options
-      });
-      
-      return result;
-    } catch (error) {
-      console.error('Save dialog error:', error);
-      return { 
-        canceled: true, 
-        error: error.message 
-      };
-    }
-  });
-
-  // ============================================
-  // SAVE FILE HANDLER
-  // ============================================
-  ipcMain.handle('save-file', async (event, { filePath, content }) => {
-    try {
-      fs.writeFileSync(filePath, content, 'utf8');
-      return { 
-        success: true, 
-        filePath 
-      };
-    } catch (error) {
-      console.error('Error saving file:', error);
-      return { 
-        success: false, 
-        error: error.message 
-      };
-    }
-  });
-}
-
-// ============================================
-// EXCEL FILE PATH RESOLVER
-// ============================================
-function getExcelFilePath() {
-  if (isDev) {
-    // Development: use file from project data directory
-    const devPath = path.join(__dirname, '../../data/templates/EXTERNAL - Trademark Tool Data (1).xlsx');
-    console.log('Development Excel path:', devPath);
-    return devPath;
-  } else {
-    // Production: use file from resources
-    const resourcePath = process.resourcesPath || path.join(process.cwd(), 'resources');
-    const prodPath = path.join(resourcePath, 'data/templates/EXTERNAL - Trademark Tool Data (1).xlsx');
-    console.log('Production Excel path:', prodPath);
-    return prodPath;
-  }
-}
-
-// ============================================
-// APP EVENT HANDLERS
-// ============================================
+// This method will be called when Electron has finished initialization
 app.whenReady().then(() => {
-  createMenu(); // Set up the custom menu first
   createWindow();
 
   app.on('activate', () => {
-    // On macOS, re-create window when dock icon is clicked
+    // On macOS it's common to re-create a window when the dock icon is clicked
     if (BrowserWindow.getAllWindows().length === 0) {
       createWindow();
     }
   });
-
-  // Set up auto-updater (disabled in development)
-  if (!isDev) {
-    autoUpdater.checkForUpdatesAndNotify();
-  }
 });
 
+// Quit when all windows are closed, except on macOS
 app.on('window-all-closed', () => {
-  // On macOS, apps stay active until user quits explicitly
-  if (!isMac) {
+  if (process.platform !== 'darwin') {
     app.quit();
   }
 });
 
-// ============================================
-// SECURITY: PREVENT NEW WINDOW CREATION
-// ============================================
-app.on('web-contents-created', (event, contents) => {
-  contents.on('new-window', (event, navigationUrl) => {
-    event.preventDefault();
-    console.warn('Blocked new window creation:', navigationUrl);
-  });
+// IPC Handlers
+ipcMain.handle('get-app-version', () => {
+  return app.getVersion();
 });
 
-// ============================================
-// AUTO-UPDATER EVENTS
-// ============================================
-autoUpdater.on('checking-for-update', () => {
-  console.log('Checking for update...');
-});
-
-autoUpdater.on('update-available', (info) => {
-  console.log('Update available:', info);
-});
-
-autoUpdater.on('update-not-available', (info) => {
-  console.log('Update not available.');
-});
-
-autoUpdater.on('error', (err) => {
-  console.log('Error in auto-updater:', err);
-});
-
-autoUpdater.on('download-progress', (progressObj) => {
-  let log_message = `Download speed: ${progressObj.bytesPerSecond}`;
-  log_message += ` - Downloaded ${progressObj.percent}%`;
-  log_message += ` (${progressObj.transferred}/${progressObj.total})`;
-  console.log(log_message);
-});
-
-autoUpdater.on('update-downloaded', (info) => {
-  console.log('Update downloaded');
-  // Auto-install update on quit
-  autoUpdater.quitAndInstall();
-});
-
-// ============================================
-// PROTOCOL HANDLER FOR DEEP LINKING
-// ============================================
-if (!app.isDefaultProtocolClient('bf-compliance')) {
-  app.setAsDefaultProtocolClient('bf-compliance');
-}
-
-// ============================================
-// GRACEFUL SHUTDOWN
-// ============================================
-process.on('SIGTERM', () => {
-  console.log('SIGTERM received, shutting down gracefully');
-  app.quit();
-});
-
-process.on('SIGINT', () => {
-  console.log('SIGINT received, shutting down gracefully');
-  app.quit();
-});
-
-// ============================================
-// UNCAUGHT EXCEPTION HANDLER
-// ============================================
-process.on('uncaughtException', (error) => {
-  console.error('Uncaught Exception:', error);
-  if (!isDev) {
-    // In production, log to file or error reporting service
-    // For now, just log to console
-  }
-});
+// Add more IPC handlers as needed for your app functionality

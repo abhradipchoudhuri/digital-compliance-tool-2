@@ -2,25 +2,12 @@
 import React, { useState } from 'react';
 import PropTypes from 'prop-types';
 import { useExcelData } from './hooks/useDataLoader';
+import templateService from './services/templateService';
 import { ChevronDown, Search, Check, Copy, Download, History, AlertCircle, Info } from 'lucide-react';
 
 const App = () => {
   // Get data from Excel hook
   const { brands: rawBrands = [], countries: rawCountries = [], assetTypes: rawAssetTypes = [], loading, error } = useExcelData();
-  
-  // DEBUG: Log to find US
-console.log('Total countries:', rawCountries.length);
-console.log('First 5 countries:', rawCountries.slice(0, 5));
-const usEntries = rawCountries.filter(c => 
-  c.code === 'US' || 
-  c.code === 'USA' || 
-  c.name.includes('United States') ||
-  c.name.includes('United')
-);
-console.log('Looking for US:', usEntries);
-console.log('US Details:', JSON.stringify(usEntries, null, 2));
-console.log('All country codes:', rawCountries.map(c => c.code).sort());
-console.log('Countries with empty/null names:', rawCountries.filter(c => !c.name || c.name.trim() === ''));
   
   // Form state
   const [selectedAssetType, setSelectedAssetType] = useState('');
@@ -30,11 +17,13 @@ console.log('Countries with empty/null names:', rawCountries.filter(c => !c.name
   const [showMultiBrandNote, setShowMultiBrandNote] = useState(false);
   const [generatedCopy, setGeneratedCopy] = useState(null);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [copyError, setCopyError] = useState(null);
 
   // Process brands with unique IDs
   const brands = rawBrands.map((brand, index) => ({
     id: `${brand.id}-${index}`, // Make ID unique by adding index
     name: brand.name,
+    originalId: brand.id, // Keep original ID for template service
     entity: brand.entity
   }));
 
@@ -67,6 +56,7 @@ console.log('Countries with empty/null names:', rawCountries.filter(c => !c.name
   };
 
   const handleGenerate = async () => {
+    // Validation
     if (!selectedAssetType) {
       alert('Please select an Asset Type');
       return;
@@ -81,25 +71,108 @@ console.log('Countries with empty/null names:', rawCountries.filter(c => !c.name
     }
 
     setIsGenerating(true);
+    setCopyError(null);
     
-    setTimeout(() => {
+    try {
+      console.log('🎯 App: Starting copy generation...');
+      
+      // Get actual brand names from selected IDs
       const selectedBrandNames = Array.from(selectedBrands)
-        .map(id => brands.find(b => b.id === id)?.name)
+        .map(id => {
+          const brand = brands.find(b => b.id === id);
+          // Use original brand name from Excel
+          return brand?.name;
+        })
         .filter(Boolean);
       
-      const countryName = countries.find(c => c.code === selectedCountry)?.name;
+      console.log('📋 Selected brands:', selectedBrandNames);
+      console.log('📋 Selected asset type:', selectedAssetType);
+      console.log('📋 Selected country:', selectedCountry);
       
-      setGeneratedCopy({
-        plainText: `Generated legal copy for ${selectedAssetType} in ${countryName}:\n\nBrands: ${selectedBrandNames.join(', ')}\n\nThis is a placeholder for the actual generated compliance copy. The real implementation will use the templateService and Excel data to generate proper legal text with all required disclaimers, trademark notices, and compliance statements.`,
-        html: `<div><h3>Generated Legal Copy</h3><p><strong>Asset Type:</strong> ${selectedAssetType}</p><p><strong>Country:</strong> ${countryName}</p><p><strong>Brands:</strong> ${selectedBrandNames.join(', ')}</p><div style="margin-top: 20px; padding: 15px; border: 1px solid #ccc; background: #f9f9f9;"><p>This is a placeholder for the actual generated compliance copy. The real implementation will use the templateService and Excel data to generate proper legal text with all required disclaimers, trademark notices, and compliance statements.</p></div></div>`
+      // Call the real copy generation service
+      const result = await templateService.generateCopy({
+        assetType: selectedAssetType,
+        countryCode: selectedCountry,
+        brandIds: selectedBrandNames // Brand names are used as IDs
       });
+      
+      console.log('📦 Generation result:', result);
+      
+      if (result.success) {
+        setGeneratedCopy({
+          plainText: result.result.copy.plainText,
+          html: result.result.copy.html,
+          metadata: result.result.metadata
+        });
+        console.log('✅ Copy generated successfully!');
+        
+        // Scroll to the generated copy
+        setTimeout(() => {
+          document.getElementById('generated-copy-section')?.scrollIntoView({ 
+            behavior: 'smooth', 
+            block: 'start' 
+          });
+        }, 100);
+      } else {
+        const errorMsg = result.error || 'Unknown error occurred';
+        setCopyError(errorMsg);
+        console.error('❌ Generation failed:', errorMsg);
+      }
+      
+    } catch (error) {
+      console.error('❌ Error in handleGenerate:', error);
+      setCopyError(error.message);
+    } finally {
       setIsGenerating(false);
-    }, 1500);
+    }
   };
 
   const copyToClipboard = (text) => {
-    navigator.clipboard.writeText(text);
+    navigator.clipboard.writeText(text)
+      .then(() => {
+        alert('Copied to clipboard!');
+      })
+      .catch(err => {
+        console.error('Failed to copy:', err);
+        alert('Failed to copy to clipboard');
+      });
   };
+
+  const handleCopyAndClose = () => {
+    if (generatedCopy) {
+      copyToClipboard(generatedCopy.plainText);
+      // Optionally reset the form
+      setTimeout(() => {
+        setGeneratedCopy(null);
+        setSelectedAssetType('');
+        setSelectedCountry('');
+        setSelectedBrands(new Set());
+        setSearchQuery('');
+      }, 1000);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-16 h-16 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading Excel data...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="bg-red-50 border border-red-200 rounded-lg p-6 max-w-md">
+          <h2 className="text-red-800 font-semibold mb-2">Error Loading Data</h2>
+          <p className="text-red-600">{error}</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -170,6 +243,17 @@ console.log('Countries with empty/null names:', rawCountries.filter(c => !c.name
             </div>
           )}
 
+          {/* Error Display */}
+          {copyError && (
+            <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
+              <div className="flex items-center gap-2 text-red-800">
+                <AlertCircle size={20} />
+                <span className="font-medium">Generation Error</span>
+              </div>
+              <p className="text-red-700 text-sm mt-1">{copyError}</p>
+            </div>
+          )}
+
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8">
             {/* Form Section */}
             <div className="space-y-8">
@@ -209,7 +293,7 @@ console.log('Countries with empty/null names:', rawCountries.filter(c => !c.name
                     <option value="">Select Country</option>
                     {countries.map((country) => (
                       <option key={country.code} value={country.code}>
-                        {country.name}
+                        {country.name} ({country.language})
                       </option>
                     ))}
                   </select>
@@ -295,11 +379,35 @@ console.log('Countries with empty/null names:', rawCountries.filter(c => !c.name
 
             {/* Generated Copy Output */}
             {generatedCopy && (
-              <div className="mt-12 border-t border-gray-200 pt-8">
+              <div id="generated-copy-section" className="mt-12 border-t border-gray-200 pt-8">
                 <h3 className="text-xl font-semibold text-gray-900 mb-6 flex items-center gap-2">
                   <span className="w-3 h-3 bg-green-500 rounded-full"></span>
                   Generated Legal Copy
                 </h3>
+                
+                {/* Metadata */}
+                {generatedCopy.metadata && (
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4 text-sm">
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                      <div>
+                        <span className="font-semibold text-blue-900">Asset Type:</span>
+                        <p className="text-blue-700">{generatedCopy.metadata.assetType}</p>
+                      </div>
+                      <div>
+                        <span className="font-semibold text-blue-900">Country:</span>
+                        <p className="text-blue-700">{generatedCopy.metadata.countryCode}</p>
+                      </div>
+                      <div>
+                        <span className="font-semibold text-blue-900">Language:</span>
+                        <p className="text-blue-700">{generatedCopy.metadata.language}</p>
+                      </div>
+                      <div>
+                        <span className="font-semibold text-blue-900">Brands:</span>
+                        <p className="text-blue-700">{generatedCopy.metadata.brands?.join(', ')}</p>
+                      </div>
+                    </div>
+                  </div>
+                )}
                 
                 <div className="bg-gray-50 border border-gray-200 rounded-lg p-6">
                   <div className="prose prose-sm max-w-none">
@@ -308,7 +416,7 @@ console.log('Countries with empty/null names:', rawCountries.filter(c => !c.name
                   
                   <div className="flex gap-3 mt-6 pt-6 border-t border-gray-300">
                     <button
-                      onClick={() => copyToClipboard(generatedCopy.plainText)}
+                      onClick={handleCopyAndClose}
                       className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors duration-200"
                     >
                       <Copy size={16} />
@@ -332,10 +440,11 @@ console.log('Countries with empty/null names:', rawCountries.filter(c => !c.name
                     </button>
                     
                     <button
-                      className="flex items-center gap-2 px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-lg transition-colors duration-200"
+                      onClick={() => copyToClipboard(generatedCopy.plainText)}
+                      className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors duration-200"
                     >
-                      <History size={16} />
-                      Save to History
+                      <Copy size={16} />
+                      Copy Plain Text
                     </button>
                   </div>
                 </div>
@@ -348,9 +457,11 @@ console.log('Countries with empty/null names:', rawCountries.filter(c => !c.name
             <div className="mt-8 bg-gray-100 border rounded-lg p-4">
               <h4 className="text-sm font-medium text-gray-700 mb-2">Development Status</h4>
               <div className="text-xs text-gray-600 space-y-1">
-                <div>Brands loaded: {brands.length}</div>
-                <div>Countries loaded: {countries.length}</div>
-                <div>Asset Types loaded: {assetTypes.length}</div>
+                <div>✅ Brands loaded: {brands.length}</div>
+                <div>✅ Countries loaded: {countries.length}</div>
+                <div>✅ Asset Types loaded: {assetTypes.length}</div>
+                <div>✅ Template Service: Initialized</div>
+                <div>✅ Copy Generator: Ready</div>
               </div>
             </div>
           )}

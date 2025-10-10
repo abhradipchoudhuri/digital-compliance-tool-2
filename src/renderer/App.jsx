@@ -176,21 +176,18 @@ const App = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-amber-50/20 to-gray-50">
       {/* Header */}
-      <header className="bg-gradient-to-b from-gray-50 to-white border-b-2 border-amber-600 shadow-sm">
-        <div className="container mx-auto px-6 py-8">
-          <div className="flex flex-col items-center text-center">
-            {/* Title - Larger and Bolder */}
-            <h1 className="text-3xl font-bold text-gray-800 mb-2">
-              Legal Copy Generator
-            </h1>
-            
-            {/* Subtitle */}
-            <p className="text-base text-amber-700 font-medium">
-              Brown-Forman Corporation
-            </p>
-          </div>
-        </div>
-      </header>
+      <header className="bg-gray-900 text-white shadow-md">
+  <div className="container mx-auto px-6 py-6">
+    <div className="flex flex-col items-center text-center">
+      <h1 className="text-3xl font-bold mb-1">
+        Legal Copy Generator
+      </h1>
+      <p className="text-sm text-gray-300">
+        Brown-Forman Corporation
+      </p>
+    </div>
+  </div>
+</header>
 
       <div className="container mx-auto px-6 py-8">
         <div className="max-w-6xl mx-auto">

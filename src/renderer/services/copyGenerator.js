@@ -1,6 +1,7 @@
 // src/renderer/services/copyGenerator.js
 // Core Copy Generation Engine - WITH ENHANCED TTB FUZZY MATCHING
 // ✅ FIXED: [object Object] issue with UGC Policy and other langVars
+// ✅ NEW: Uses "Website Legal Documents (Hyperlinks)" column from Excel
 
 class CopyGenerator {
   constructor() {
@@ -535,42 +536,47 @@ class CopyGenerator {
       console.log('✅ Replaced: Responsibility Site');
     }
 
+    // ✅ NEW: Use pre-built hyperlinks from Excel for Legal Documents
     if (copyText.includes('<<Legal Documents>>')) {
-      // Get URLs from language variables
-      const termsUrl = this.safeGetValue(langVars['Terms of Use'], 'Terms of Use');
-      const privacyUrl = this.safeGetValue(langVars['Privacy Policy'], 'Privacy Policy');
-      const cookieUrl = this.safeGetValue(langVars['Cookie Policy'], 'Cookie Policy');
+      // ✅ PRIORITY 1: Check for pre-built hyperlinks column (NEW!)
+      const prebuiltHyperlinks = this.safeGetValue(
+        langVars['Website Legal Documents (Hyperlinks)'], 
+        'Website Legal Documents (Hyperlinks)'
+      );
       
-      // Get the localized legal documents text
-      const legalDocs = this.safeGetValue(langVars['Website Legal Documents'], 'Website Legal Documents');
-      
-      // LANGUAGE-AGNOSTIC APPROACH: Split by " | " and hyperlink by position
-      // Typically: [Terms of Use] | [Privacy Policy] | [Cookie Policy] | [Other items...]
-      const segments = legalDocs.split('|').map(s => s.trim());
-      
-      const hyperlinkSegments = segments.map((segment, index) => {
-        // Position 0: Terms of Use
-        if (index === 0 && termsUrl) {
-          return `<a href="${termsUrl}" target="_blank" rel="noopener noreferrer">${segment}</a>`;
-        }
-        // Position 1: Privacy Policy
-        else if (index === 1 && privacyUrl) {
-          return `<a href="${privacyUrl}" target="_blank" rel="noopener noreferrer">${segment}</a>`;
-        }
-        // Position 2: Cookie Policy
-        else if (index === 2 && cookieUrl) {
-          return `<a href="${cookieUrl}" target="_blank" rel="noopener noreferrer">${segment}</a>`;
-        }
-        // Everything else stays as plain text
-        else {
-          return segment;
-        }
-      });
-      
-      const hyperlinkDocs = hyperlinkSegments.join(' | ');
-      
-      copyText = copyText.replace(/<<Legal Documents>>/g, hyperlinkDocs);
-      console.log('✅ Replaced: Legal Documents (with position-based hyperlinks for all languages)');
+      if (prebuiltHyperlinks) {
+        // Use the pre-built HTML hyperlinks directly from Excel
+        copyText = copyText.replace(/<<Legal Documents>>/g, prebuiltHyperlinks);
+        console.log('✅ Replaced: Legal Documents (using pre-built hyperlinks from Excel)');
+      } else {
+        // FALLBACK: Build hyperlinks programmatically (old approach)
+        console.log('⚠️ "Website Legal Documents (Hyperlinks)" column not found, using fallback');
+        
+        const termsUrl = this.safeGetValue(langVars['Terms of Use'], 'Terms of Use');
+        const privacyUrl = this.safeGetValue(langVars['Privacy Policy'], 'Privacy Policy');
+        const cookieUrl = this.safeGetValue(langVars['Cookie Policy'], 'Cookie Policy');
+        
+        const legalDocs = this.safeGetValue(langVars['Website Legal Documents'], 'Website Legal Documents');
+        
+        // LANGUAGE-AGNOSTIC APPROACH: Split by " | " and hyperlink by position
+        const segments = legalDocs.split('|').map(s => s.trim());
+        
+        const hyperlinkSegments = segments.map((segment, index) => {
+          if (index === 0 && termsUrl) {
+            return `<a href="${termsUrl}" target="_blank" rel="noopener noreferrer">${segment}</a>`;
+          } else if (index === 1 && privacyUrl) {
+            return `<a href="${privacyUrl}" target="_blank" rel="noopener noreferrer">${segment}</a>`;
+          } else if (index === 2 && cookieUrl) {
+            return `<a href="${cookieUrl}" target="_blank" rel="noopener noreferrer">${segment}</a>`;
+          } else {
+            return segment;
+          }
+        });
+        
+        const hyperlinkDocs = hyperlinkSegments.join(' | ');
+        copyText = copyText.replace(/<<Legal Documents>>/g, hyperlinkDocs);
+        console.log('✅ Replaced: Legal Documents (using fallback position-based hyperlinks)');
+      }
     }
 
     if (copyText.includes('<<Email Sent By>>')) {
@@ -760,7 +766,9 @@ class CopyGenerator {
 
   stripHtml(html) {
     // First, convert hyperlinks to readable format: "Text (URL)"
-    let text = html.replace(/<a\s+href=["']([^"']+)["'][^>]*>([^<]+)<\/a>/gi, '$2 ($1)');
+    // ✅ FIXED: Handle both quoted and unquoted href values
+    // Matches: <a href="url"> OR <a href=url> (with or without quotes)
+    let text = html.replace(/<a\s+href=["']?([^"'\s>]+)["']?[^>]*>([^<]+)<\/a>/gi, '$2 ($1)');
     
     // Then remove all other HTML tags
     text = text

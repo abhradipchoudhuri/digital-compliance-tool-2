@@ -1,5 +1,6 @@
 // src/renderer/services/copyGenerator.js
-// Core Copy Generation Engine - WITH ENHANCED TTB LOGIC
+// Core Copy Generation Engine - WITH ENHANCED TTB FUZZY MATCHING
+// ✅ FIXED: [object Object] issue with UGC Policy and other langVars
 
 class CopyGenerator {
   constructor() {
@@ -10,8 +11,68 @@ class CopyGenerator {
     this.trademarkLanguage = null;
     this.trademarkStructure = null;
     this.countryLanguage = null;
-    this.ttbStatements = null; // NEW: Store TTB statements
+    this.ttbStatements = null;
     this.excelService = null;
+    
+    // ✅ ASSET TYPE → TTB TYPE MAPPING
+    // Each asset type determines which TTB statement version to use
+    this.ASSET_TYPE_TO_TTB_TYPE = {
+      "Digital | Asset Dynamic Loop (GIF/Cinemagraph)": "Tightened",
+      "Digital | Asset Static (paid)": "Tightened",
+      "Digital | Asset Video (paid & organic)": "Full",
+      "Digital | Bio Facebook (About Section)": "Tightened",
+      "Digital | Bio Instagram": "Limited Character",
+      "Digital | Bio Pinterest": "Limited Character",
+      "Digital | Bio Twitter": "Limited Character",
+      "Digital | Email Footer": "Full",
+      "Digital | Media - Digital TV (Streaming)": "Full",
+      "Digital | Media - Display Banner - Dynamic": "Limited Character",
+      "Digital | Media - Display Banner - Static": "Limited Character",
+      "Digital | Web Age-Gate Footer": "Full",
+      "Digital | Web Footer": "Full",
+      "Digital | eCommerce Content": "Tightened",
+      "Traditional & Digital | Out-of-Home (OOH)": "Full",
+      "Traditional & Digital | Radio/Podcast": "Tightened",
+      "Traditional | Consumer Advertising Specialty (ex. Keychain)": "Limited Character",
+      "Traditional | Consumer-Facing Print Media (ex. Magazine)": "Full",
+      "Traditional | Point of Sale (POS) - Signage, Print": "Full",
+      "Traditional | Retailer Advertising Specialty (ex. Gutter Mat)": "Full",
+      "Traditional | Standard TV": "Full"
+    };
+  }
+
+  // ✅ NEW HELPER: Safe value getter to prevent [object Object]
+  safeGetValue(value, fieldName = 'field') {
+    // Handle null/undefined
+    if (value === null || value === undefined) {
+      return '';
+    }
+    
+    // If it's already a string or number, return it as string
+    if (typeof value === 'string' || typeof value === 'number') {
+      return String(value);
+    }
+    
+    // If it's an object (this causes [object Object])
+    if (typeof value === 'object') {
+      console.warn(`⚠️ Field "${fieldName}" returned an object, attempting to extract value...`);
+      
+      // Try common object structures
+      if (value.text) return String(value.text);
+      if (value.value) return String(value.value);
+      if (value.content) return String(value.content);
+      
+      // If it's an array, join it
+      if (Array.isArray(value)) {
+        return value.join(' ');
+      }
+      
+      console.error(`❌ Cannot extract string from object for "${fieldName}":`, value);
+      return '';
+    }
+    
+    // Fallback: convert to string
+    return String(value);
   }
 
   initialize(excelData, excelService) {
@@ -27,7 +88,7 @@ class CopyGenerator {
     this.languageData = excelData['Language Dependent Variables'] || [];
     this.trademarkLanguage = excelData['Trademark Language'] || [];
     this.countryLanguage = excelData['CountryLanguage'] || [];
-    this.ttbStatements = excelData['TTB Statements'] || []; // NEW: Store TTB data
+    this.ttbStatements = excelData['TTB Statements'] || [];
     
     this.excelService = excelService;
 
@@ -38,16 +99,14 @@ class CopyGenerator {
       languageData: this.languageData.length,
       trademarkLanguage: this.trademarkLanguage.length,
       countryLanguage: this.countryLanguage.length,
-      ttbStatements: this.ttbStatements.length // NEW: Log TTB count
+      ttbStatements: this.ttbStatements.length
     });
 
-    // NEW: Log sample TTB data for debugging
     if (this.ttbStatements.length > 0) {
       console.log('📋 Sample TTB Statement columns:', Object.keys(this.ttbStatements[0]));
       console.log('📋 First TTB brand:', this.ttbStatements[0]['Brand Name'] || this.ttbStatements[0]);
     }
 
-    // NEW: Log sample Trademark Config columns for TTB Type debugging
     if (this.trademarkData.length > 0) {
       console.log('📋 Trademark Config columns:', Object.keys(this.trademarkData[0]));
       const sampleBrand = this.trademarkData[0];
@@ -115,7 +174,8 @@ class CopyGenerator {
         langVars,
         brandDataList,
         countryCode,
-        language
+        language,
+        assetType
       );
 
       const generationTime = Date.now() - startTime;
@@ -214,65 +274,137 @@ class CopyGenerator {
     return brandDataList;
   }
 
-  // ✅ ENHANCED: Better TTB statement lookup with fuzzy matching
-  getTTBStatement(brandName, ttbType = 'Full') {
+  getTTBStatement(brandName, ttbType = 'Full', displayName = null) {
     console.log(`🔍 Looking up TTB statement for: "${brandName}" (Type: ${ttbType})`);
+    if (displayName && displayName !== brandName) {
+      console.log(`   Also have Display Names: "${displayName}"`);
+    }
     
     if (!this.ttbStatements || this.ttbStatements.length === 0) {
       console.warn('⚠️ TTB Statements sheet is empty or not loaded');
       return '';
     }
 
-    // Log available brand names in TTB sheet for debugging
     const availableTTBBrands = this.ttbStatements.map(row => 
       row['Brand Name'] || row['Brand'] || row['BrandName']
     ).filter(Boolean);
-    console.log('📋 Available TTB brands:', availableTTBBrands.slice(0, 10));
+    console.log('📋 Available TTB brands (first 10):', availableTTBBrands.slice(0, 10));
 
-    // Helper function to normalize brand names for matching
-    const normalize = (name) => {
+    const aggressiveNormalize = (name) => {
       if (!name) return '';
-      return name.toLowerCase().trim().replace(/[^\w\s]/g, '');
+      return name
+        .toLowerCase()
+        .trim()
+        .replace(/[^\w\s]/g, '')
+        .replace(/\bno\s+/g, 'n')
+        .replace(/\bn\s+/g, 'n')
+        .replace(/\bno\b/g, 'n')
+        .replace(/\s+/g, '');
     };
 
-    const normalizedSearch = normalize(brandName);
+    const extractKeyParts = (name) => {
+      if (!name) return [];
+      const normalized = name.toLowerCase();
+      const parts = [];
+      
+      const numbers = normalized.match(/\d+/g) || [];
+      parts.push(...numbers);
+      
+      const words = normalized
+        .replace(/[^\w\s]/g, ' ')
+        .split(/\s+/)
+        .filter(w => w.length > 2 && !['the', 'and', 'for', 'from'].includes(w));
+      parts.push(...words);
+      
+      return parts;
+    };
 
-    // Try exact match first
-    let ttbRow = this.ttbStatements.find(row => {
-      const rowBrandName = row['Brand Name'] || row['Brand'] || row['BrandName'];
-      return rowBrandName === brandName;
-    });
+    const tryMatch = (searchName) => {
+      if (!searchName) return null;
+      
+      const normalizedSearch = aggressiveNormalize(searchName);
+      const searchKeyParts = extractKeyParts(searchName);
+      
+      let ttbRow = this.ttbStatements.find(row => {
+        const rowBrandName = row['Brand Name'] || row['Brand'] || row['BrandName'];
+        return rowBrandName === searchName;
+      });
+      if (ttbRow) return { row: ttbRow, strategy: 'EXACT' };
 
-    // If no exact match, try normalized match
-    if (!ttbRow) {
-      console.log('⚠️ No exact match, trying fuzzy match...');
       ttbRow = this.ttbStatements.find(row => {
         const rowBrandName = row['Brand Name'] || row['Brand'] || row['BrandName'];
-        return normalize(rowBrandName) === normalizedSearch;
+        return aggressiveNormalize(rowBrandName) === normalizedSearch;
       });
-    }
+      if (ttbRow) return { row: ttbRow, strategy: 'NORMALIZED' };
 
-    // If still no match, try contains match
-    if (!ttbRow) {
-      console.log('⚠️ No fuzzy match, trying contains match...');
+      if (searchKeyParts.length > 0) {
+        ttbRow = this.ttbStatements.find(row => {
+          const rowBrandName = row['Brand Name'] || row['Brand'] || row['BrandName'];
+          const rowNormalized = aggressiveNormalize(rowBrandName);
+          const rowKeyParts = extractKeyParts(rowBrandName);
+          
+          const allPartsMatch = searchKeyParts.every(part => 
+            rowNormalized.includes(part) || rowKeyParts.includes(part)
+          );
+          
+          return allPartsMatch;
+        });
+        if (ttbRow) return { row: ttbRow, strategy: 'KEY_PARTS' };
+      }
+
       ttbRow = this.ttbStatements.find(row => {
         const rowBrandName = row['Brand Name'] || row['Brand'] || row['BrandName'];
-        const normalizedRow = normalize(rowBrandName);
-        return normalizedRow.includes(normalizedSearch) || normalizedSearch.includes(normalizedRow);
+        const rowNormalized = aggressiveNormalize(rowBrandName);
+        
+        const match = rowNormalized.includes(normalizedSearch) || 
+                     normalizedSearch.includes(rowNormalized);
+        
+        return match;
       });
+      if (ttbRow) return { row: ttbRow, strategy: 'CONTAINS' };
+
+      if (!searchName.toLowerCase().includes('jack')) {
+        const withPrefix = `Jack Daniel's ${searchName}`;
+        const normalizedWithPrefix = aggressiveNormalize(withPrefix);
+        
+        ttbRow = this.ttbStatements.find(row => {
+          const rowBrandName = row['Brand Name'] || row['Brand'] || row['BrandName'];
+          const rowNormalized = aggressiveNormalize(rowBrandName);
+          return rowNormalized === normalizedWithPrefix || 
+                 rowNormalized.includes(normalizedWithPrefix) ||
+                 normalizedWithPrefix.includes(rowNormalized);
+        });
+        if (ttbRow) return { row: ttbRow, strategy: 'PREFIX' };
+      }
+
+      return null;
+    };
+
+    console.log(`   Trying Brand Names: "${brandName}"`);
+    let result = tryMatch(brandName);
+    
+    if (!result && displayName && displayName !== brandName) {
+      console.log(`   ⚠️ No match with Brand Names, trying Display Names: "${displayName}"`);
+      result = tryMatch(displayName);
+      if (result) {
+        console.log(`   ✅ Found match using Display Names!`);
+      }
     }
 
-    if (!ttbRow) {
+    if (!result) {
       console.warn(`❌ No TTB statement found for brand: "${brandName}"`);
+      if (displayName && displayName !== brandName) {
+        console.warn(`   Also tried Display Names: "${displayName}"`);
+      }
       console.warn(`   Available brands: ${availableTTBBrands.slice(0, 5).join(', ')}...`);
       return '';
     }
 
-    console.log(`✅ Found TTB row for: "${ttbRow['Brand Name'] || ttbRow['Brand']}"`);
-    console.log('📋 Available columns in TTB row:', Object.keys(ttbRow));
+    const ttbRow = result.row;
+    const matchStrategy = result.strategy;
+    
+    console.log(`✅ Found TTB row for: "${ttbRow['Brand Name'] || ttbRow['Brand']}" [${matchStrategy}]`);
 
-    // Get the appropriate TTB statement based on type
-    // Handle different possible column names
     let statement = '';
     
     if (ttbType === 'Full') {
@@ -295,7 +427,6 @@ class CopyGenerator {
                   '';
     }
 
-    // If no statement found for specific type, try default column
     if (!statement) {
       console.warn(`⚠️ No statement found for type "${ttbType}", trying default...`);
       statement = ttbRow['TTB Statement'] || ttbRow['Statement'] || '';
@@ -310,22 +441,33 @@ class CopyGenerator {
     return statement;
   }
 
-  buildCopyFromTemplate(template, langVars, brandDataList, countryCode, language) {
+  buildCopyFromTemplate(template, langVars, brandDataList, countryCode, language, assetType) {
     let copyText = template.Structure || '';
 
     console.log('🔨 Building copy from template...');
     console.log('📝 Original template:', copyText);
     console.log('🌍 Country code:', countryCode);
     console.log('🏷️ Number of brands:', brandDataList.length);
+    console.log('🎨 Asset Type:', assetType);
 
-    // Replace <<Responsibility Language>>
+    const ttbTypeForAsset = this.ASSET_TYPE_TO_TTB_TYPE[assetType];
+    if (ttbTypeForAsset) {
+      console.log(`✅ TTB Type for "${assetType}": ${ttbTypeForAsset}`);
+    } else {
+      console.warn(`⚠️ No TTB Type mapping found for "${assetType}", defaulting to "Full"`);
+    }
+    const ttbType = ttbTypeForAsset || 'Full';
+
+    // ✅ FIXED: Use safeGetValue for ALL langVars replacements
     if (copyText.includes('<<Responsibility Language>>')) {
-      const respLang = langVars['Responsibility Language '] || langVars['Responsibility Language'] || '';
+      const respLang = this.safeGetValue(
+        langVars['Responsibility Language '] || langVars['Responsibility Language'],
+        'Responsibility Language'
+      );
       copyText = copyText.replace(/<<Responsibility Language>>/g, respLang);
       console.log('✅ Replaced: Responsibility Language');
     }
 
-    // ✅ ENHANCED: TTB replacement with detailed logging
     if (copyText.includes('<<TTB>>')) {
       console.log('🔍 Found <<TTB>> placeholder in template');
       console.log('🌍 Country check: Is US?', countryCode === 'US');
@@ -337,15 +479,11 @@ class CopyGenerator {
         
         for (const brandData of brandDataList) {
           const brandName = brandData['Brand Names'] || brandData['Display Names'];
-          // ✅ FIXED: Handle different TTB Type column name variations
-          const ttbType = brandData['TTB Type'] || 
-                         brandData['TTBType'] || 
-                         brandData['TTB_Type'] ||
-                         'Full'; // Default to Full if not specified
+          const displayName = brandData['Display Names'];
           
-          console.log(`🔍 Processing brand: "${brandName}" with TTB Type: "${ttbType}"`);
+          console.log(`🔍 Processing brand: "${brandName}" with TTB Type: "${ttbType}" (from Asset Type: ${assetType})`);
           
-          const ttbStatement = this.getTTBStatement(brandName, ttbType);
+          const ttbStatement = this.getTTBStatement(brandName, ttbType, displayName);
           
           if (ttbStatement) {
             ttbStatements.push(ttbStatement);
@@ -365,7 +503,6 @@ class CopyGenerator {
           console.warn('⚠️ No TTB statements found for any selected brands - placeholder removed');
         }
       } else {
-        // Non-US countries: remove TTB placeholder
         copyText = copyText.replace(/<<TTB>>/g, '');
         console.log(`✅ Removed <<TTB>> (non-US country: ${countryCode})`);
       }
@@ -373,101 +510,166 @@ class CopyGenerator {
       console.log('ℹ️ No <<TTB>> placeholder found in template');
     }
 
-    // Replace <<Trademark>>
     if (copyText.includes('<<Trademark>>')) {
       const trademarkSection = this.buildTrademarkSection(brandDataList, language);
       copyText = copyText.replace(/<<Trademark>>/g, trademarkSection);
       console.log('✅ Replaced: Trademark');
     }
 
-    // Replace <<Forward Notice>>
     if (copyText.includes('<<Forward Notice>>')) {
       const forwardNotice = this.getForwardNotice(brandDataList, langVars);
       copyText = copyText.replace(/<<Forward Notice>>/g, forwardNotice);
       console.log('✅ Replaced: Forward Notice');
     }
 
-    // Replace other placeholders...
+    // ✅ FIXED: All other replacements use safeGetValue
     if (copyText.includes('<<All Other Trademarks>>')) {
-      const allOtherTM = langVars['All Other Trademarks'] || '';
+      const allOtherTM = this.safeGetValue(langVars['All Other Trademarks'], 'All Other Trademarks');
       copyText = copyText.replace(/<<All Other Trademarks>>/g, allOtherTM);
       console.log('✅ Replaced: All Other Trademarks');
     }
 
     if (copyText.includes('<<Responsibility Site>>')) {
-      const respSite = langVars['Responsibility Site'] || '';
+      const respSite = this.safeGetValue(langVars['Responsibility Site'], 'Responsibility Site');
       copyText = copyText.replace(/<<Responsibility Site>>/g, respSite);
       console.log('✅ Replaced: Responsibility Site');
     }
 
     if (copyText.includes('<<Legal Documents>>')) {
-      const legalDocs = langVars['Website Legal Documents'] || '';
-      copyText = copyText.replace(/<<Legal Documents>>/g, legalDocs);
-      console.log('✅ Replaced: Legal Documents');
+      // Get URLs from language variables
+      const termsUrl = this.safeGetValue(langVars['Terms of Use'], 'Terms of Use');
+      const privacyUrl = this.safeGetValue(langVars['Privacy Policy'], 'Privacy Policy');
+      const cookieUrl = this.safeGetValue(langVars['Cookie Policy'], 'Cookie Policy');
+      
+      // Get the localized legal documents text
+      const legalDocs = this.safeGetValue(langVars['Website Legal Documents'], 'Website Legal Documents');
+      
+      // LANGUAGE-AGNOSTIC APPROACH: Split by " | " and hyperlink by position
+      // Typically: [Terms of Use] | [Privacy Policy] | [Cookie Policy] | [Other items...]
+      const segments = legalDocs.split('|').map(s => s.trim());
+      
+      const hyperlinkSegments = segments.map((segment, index) => {
+        // Position 0: Terms of Use
+        if (index === 0 && termsUrl) {
+          return `<a href="${termsUrl}" target="_blank" rel="noopener noreferrer">${segment}</a>`;
+        }
+        // Position 1: Privacy Policy
+        else if (index === 1 && privacyUrl) {
+          return `<a href="${privacyUrl}" target="_blank" rel="noopener noreferrer">${segment}</a>`;
+        }
+        // Position 2: Cookie Policy
+        else if (index === 2 && cookieUrl) {
+          return `<a href="${cookieUrl}" target="_blank" rel="noopener noreferrer">${segment}</a>`;
+        }
+        // Everything else stays as plain text
+        else {
+          return segment;
+        }
+      });
+      
+      const hyperlinkDocs = hyperlinkSegments.join(' | ');
+      
+      copyText = copyText.replace(/<<Legal Documents>>/g, hyperlinkDocs);
+      console.log('✅ Replaced: Legal Documents (with position-based hyperlinks for all languages)');
     }
 
     if (copyText.includes('<<Email Sent By>>')) {
-      const emailSentBy = langVars['Email Sent By Statement'] || '';
+      const emailSentBy = this.safeGetValue(langVars['Email Sent By Statement'], 'Email Sent By Statement');
       copyText = copyText.replace(/<<Email Sent By>>/g, emailSentBy);
       console.log('✅ Replaced: Email Sent By');
     }
 
     if (copyText.includes('<<Email Legal Documents>>')) {
-      const emailLegalDocs = langVars['Email Legal Documents'] || '';
-      copyText = copyText.replace(/<<Email Legal Documents>>/g, emailLegalDocs);
-      console.log('✅ Replaced: Email Legal Documents');
+      // Get URLs from language variables
+      const termsUrl = this.safeGetValue(langVars['Terms of Use'], 'Terms of Use');
+      const privacyUrl = this.safeGetValue(langVars['Privacy Policy'], 'Privacy Policy');
+      const cookieUrl = this.safeGetValue(langVars['Cookie Policy'], 'Cookie Policy');
+      
+      // Get the localized email legal documents text
+      const emailLegalDocs = this.safeGetValue(langVars['Email Legal Documents'], 'Email Legal Documents');
+      
+      // LANGUAGE-AGNOSTIC APPROACH: Split by " | " and hyperlink by position
+      const segments = emailLegalDocs.split('|').map(s => s.trim());
+      
+      const hyperlinkSegments = segments.map((segment, index) => {
+        // Position 0: Terms of Use
+        if (index === 0 && termsUrl) {
+          return `<a href="${termsUrl}" target="_blank" rel="noopener noreferrer">${segment}</a>`;
+        }
+        // Position 1: Privacy Policy
+        else if (index === 1 && privacyUrl) {
+          return `<a href="${privacyUrl}" target="_blank" rel="noopener noreferrer">${segment}</a>`;
+        }
+        // Position 2: Cookie Policy
+        else if (index === 2 && cookieUrl) {
+          return `<a href="${cookieUrl}" target="_blank" rel="noopener noreferrer">${segment}</a>`;
+        }
+        // Everything else stays as plain text
+        else {
+          return segment;
+        }
+      });
+      
+      const hyperlinkDocs = hyperlinkSegments.join(' | ');
+      
+      copyText = copyText.replace(/<<Email Legal Documents>>/g, hyperlinkDocs);
+      console.log('✅ Replaced: Email Legal Documents (with position-based hyperlinks for all languages)');
     }
 
     if (copyText.includes('<<Email Header>>')) {
-      const emailHeader = langVars['Email Header'] || '';
+      const emailHeader = this.safeGetValue(langVars['Email Header'], 'Email Header');
       copyText = copyText.replace(/<<Email Header>>/g, emailHeader);
       console.log('✅ Replaced: Email Header');
     }
 
+    // ✅ CRITICAL FIX: UGC Policy with safeGetValue
     if (copyText.includes('<<UGC Policy>>')) {
-      const ugcPolicy = langVars['UGC Policy'] || '';
+      const ugcPolicy = this.safeGetValue(langVars['UGC Policy'], 'UGC Policy');
       copyText = copyText.replace(/<<UGC Policy>>/g, ugcPolicy);
-      console.log('✅ Replaced: UGC Policy');
+      console.log('✅ Replaced: UGC Policy:', ugcPolicy);
     }
 
     if (copyText.includes('<<Age-Gate Statement>>')) {
-      const ageGate = langVars['Age-Gate Statement'] || '';
+      const ageGate = this.safeGetValue(langVars['Age-Gate Statement'], 'Age-Gate Statement');
       copyText = copyText.replace(/<<Age-Gate Statement>>/g, ageGate);
       console.log('✅ Replaced: Age-Gate Statement');
     }
 
     if (copyText.includes('<<Terms of Use>>')) {
-      const termsOfUse = langVars['Terms of Use'] || '';
-      copyText = copyText.replace(/<<Terms of Use>>/g, termsOfUse);
-      console.log('✅ Replaced: Terms of Use');
+      const termsOfUseUrl = this.safeGetValue(langVars['Terms of Use'], 'Terms of Use');
+      const termsOfUseLink = termsOfUseUrl ? `<a href="${termsOfUseUrl}" target="_blank" rel="noopener noreferrer">Terms of Use</a>` : 'Terms of Use';
+      copyText = copyText.replace(/<<Terms of Use>>/g, termsOfUseLink);
+      console.log('✅ Replaced: Terms of Use (with hyperlink)');
     }
 
     if (copyText.includes('<<Privacy Policy>>')) {
-      const privacyPolicy = langVars['Privacy Policy'] || '';
-      copyText = copyText.replace(/<<Privacy Policy>>/g, privacyPolicy);
-      console.log('✅ Replaced: Privacy Policy');
+      const privacyPolicyUrl = this.safeGetValue(langVars['Privacy Policy'], 'Privacy Policy');
+      const privacyPolicyLink = privacyPolicyUrl ? `<a href="${privacyPolicyUrl}" target="_blank" rel="noopener noreferrer">Privacy Policy</a>` : 'Privacy Policy';
+      copyText = copyText.replace(/<<Privacy Policy>>/g, privacyPolicyLink);
+      console.log('✅ Replaced: Privacy Policy (with hyperlink)');
     }
 
     if (copyText.includes('<<Cookie Policy>>')) {
-      const cookiePolicy = langVars['Cookie Policy'] || '';
-      copyText = copyText.replace(/<<Cookie Policy>>/g, cookiePolicy);
-      console.log('✅ Replaced: Cookie Policy');
+      const cookiePolicyUrl = this.safeGetValue(langVars['Cookie Policy'], 'Cookie Policy');
+      const cookiePolicyLink = cookiePolicyUrl ? `<a href="${cookiePolicyUrl}" target="_blank" rel="noopener noreferrer">Cookie Policy</a>` : 'Cookie Policy';
+      copyText = copyText.replace(/<<Cookie Policy>>/g, cookiePolicyLink);
+      console.log('✅ Replaced: Cookie Policy (with hyperlink)');
     }
 
     if (copyText.includes('<<Terms Agreement>>')) {
-      const termsAgreement = langVars['Terms Agreement'] || '';
+      const termsAgreement = this.safeGetValue(langVars['Terms Agreement'], 'Terms Agreement');
       copyText = copyText.replace(/<<Terms Agreement>>/g, termsAgreement);
       console.log('✅ Replaced: Terms Agreement');
     }
 
     if (copyText.includes('<<Email Opt-In Statement>>')) {
-      const optIn = langVars['Email Opt-In Statement and Consent Statement'] || '';
+      const optIn = this.safeGetValue(langVars['Email Opt-In Statement and Consent Statement'], 'Email Opt-In Statement');
       copyText = copyText.replace(/<<Email Opt-In Statement>>/g, optIn);
       console.log('✅ Replaced: Email Opt-In Statement');
     }
 
     if (copyText.includes('<<Abbreviated Privacy Policy>>')) {
-      const abbrevPrivacy = langVars['Abbreviated Privacy Policy'] || '';
+      const abbrevPrivacy = this.safeGetValue(langVars['Abbreviated Privacy Policy'], 'Abbreviated Privacy Policy');
       copyText = copyText.replace(/<<Abbreviated Privacy Policy>>/g, abbrevPrivacy);
       console.log('✅ Replaced: Abbreviated Privacy Policy');
     }
@@ -544,9 +746,9 @@ class CopyGenerator {
     const forwardNoticeType = brandDataList[0]['Forward Notice Type'];
 
     if (forwardNoticeType === 'Full') {
-      return langVars['Forward Notice Full'] || '';
+      return this.safeGetValue(langVars['Forward Notice Full'], 'Forward Notice Full');
     } else if (forwardNoticeType === 'Tightened') {
-      return langVars['Forward Notice Tightened'] || '';
+      return this.safeGetValue(langVars['Forward Notice Tightened'], 'Forward Notice Tightened');
     }
 
     return '';
@@ -557,7 +759,11 @@ class CopyGenerator {
   }
 
   stripHtml(html) {
-    return html
+    // First, convert hyperlinks to readable format: "Text (URL)"
+    let text = html.replace(/<a\s+href=["']([^"']+)["'][^>]*>([^<]+)<\/a>/gi, '$2 ($1)');
+    
+    // Then remove all other HTML tags
+    text = text
       .replace(/<br\s*\/?>/gi, '\n')
       .replace(/<\/p>/gi, '\n\n')
       .replace(/<[^>]*>/g, '')
@@ -567,6 +773,8 @@ class CopyGenerator {
       .replace(/&gt;/g, '>')
       .replace(/&quot;/g, '"')
       .trim();
+    
+    return text;
   }
 
   countWords(text) {

@@ -393,8 +393,18 @@ const App = () => {
 
                   <div className="border-2 border-slate-200 rounded-lg p-4 max-h-96 overflow-y-auto">
                     <div 
-                      className="text-sm text-slate-700 whitespace-pre-wrap"
+                      className="text-sm text-slate-700 generated-legal-copy"
                       dangerouslySetInnerHTML={{ __html: generatedCopy.html }}
+                      style={{ 
+                        whiteSpace: 'pre-wrap',
+                        pointerEvents: 'auto'
+                      }}
+                      onClick={(e) => {
+                        // Allow link clicks to propagate
+                        if (e.target.tagName === 'A') {
+                          e.stopPropagation();
+                        }
+                      }}
                     />
                   </div>
 

@@ -1,5 +1,5 @@
 /* src/renderer/styles/globals.css
-   Global styles for Digital Compliance Tool - FIXED VERSION */
+   Global styles for Digital Compliance Tool - COMPLETE VERSION WITH HYPERLINK FIX */
 
    @import 'tailwindcss/base';
    @import 'tailwindcss/components';
@@ -242,3 +242,38 @@
        background: white !important;
      }
    }
+   
+   /* ========================================
+      HYPERLINK STYLES FOR GENERATED LEGAL COPY
+      ======================================== */
+   
+   /* Container styling to ensure proper stacking and click behavior */
+   .generated-legal-copy {
+     position: relative;
+     z-index: 1;
+   }
+   
+   /* Hyperlink styling - MUST BE CLICKABLE */
+   .generated-legal-copy a {
+     color: #2563eb !important;
+     text-decoration: underline !important;
+     cursor: pointer !important;
+     pointer-events: auto !important;
+     position: relative;
+     z-index: 2;
+     transition: color 0.2s ease;
+   }
+   
+   .generated-legal-copy a:hover {
+     color: #1d4ed8 !important;
+     text-decoration: underline !important;
+   }
+   
+   .generated-legal-copy a:visited {
+     color: #7c3aed !important;
+   }
+   
+   .generated-legal-copy a:active {
+     color: #1e40af !important;
+   }
+   

@@ -1,5 +1,5 @@
 // src/main/main.js
-// Electron Main Process - Complete with ExcelJS Integration
+// Electron Main Process - Complete with Fixed ExcelJS Parsing and CORRECT FILENAME
 
 const { app, BrowserWindow, ipcMain, dialog } = require('electron');
 const path = require('path');
@@ -19,7 +19,9 @@ let mainWindow;
 // Import menu configuration
 const { createMenu } = require('./menu');
 
-// Create the main application window
+// ============================================
+// CREATE MAIN WINDOW
+// ============================================
 function createWindow() {
   mainWindow = new BrowserWindow({
     width: 1400,
@@ -36,6 +38,7 @@ function createWindow() {
       preload: path.join(__dirname, '../preload/preload.js'),
       sandbox: true,
       webSecurity: isDev ? false : true,
+      allowRunningInsecureContent: isDev ? true : false
     }
   });
 
@@ -69,6 +72,9 @@ function createWindow() {
   setupIPC();
 }
 
+// ============================================
+// SECURITY SETUP
+// ============================================
 function setupSecurity() {
   // Prevent new window creation
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
@@ -86,9 +92,33 @@ function setupSecurity() {
   });
 }
 
+// ============================================
+// EXCEL FILE PATH RESOLVER
+// ✅ FIXED: Correct filename with underscores
+// ============================================
+function getExcelFilePath() {
+  if (isDev) {
+    // Development: use file from project data directory
+    // ✅ CORRECT FILENAME: EXTERNAL__Trademark_Tool_Data_LCG_2_0.xlsx
+    const devPath = path.join(__dirname, '../../data/templates/EXTERNAL__Trademark_Tool_Data_LCG_2_0.xlsx');
+    console.log('Development Excel path:', devPath);
+    return devPath;
+  } else {
+    // Production: use file from resources
+    const resourcePath = process.resourcesPath || path.join(process.cwd(), 'resources');
+    const prodPath = path.join(resourcePath, 'data/templates/EXTERNAL__Trademark_Tool_Data_LCG_2_0.xlsx');
+    console.log('Production Excel path:', prodPath);
+    return prodPath;
+  }
+}
+
+// ============================================
+// IPC HANDLERS SETUP
+// ============================================
 function setupIPC() {
   // ============================================
-  // EXCEL DATA LOADING WITH EXCELJS PARSING
+  // EXCEL DATA LOADING WITH FIXED PARSER
+  // ✅ FIXED: Handles empty columns properly
   // ============================================
   ipcMain.handle('load-excel-data', async () => {
     try {
@@ -116,18 +146,24 @@ function setupIPC() {
         // Get headers from first row
         const headerRow = worksheet.getRow(1);
         const headers = [];
+        const maxColumns = headerRow.cellCount;
         
-        headerRow.eachCell((cell, colNumber) => {
-          // Clean header names - trim whitespace and handle null values
+        // ✅ FIXED: Iterate through all columns, including empty ones
+        for (let colNumber = 1; colNumber <= maxColumns; colNumber++) {
+          const cell = headerRow.getCell(colNumber);
           const headerValue = cell.value;
-          if (headerValue !== null && headerValue !== undefined) {
+          
+          if (headerValue !== null && headerValue !== undefined && headerValue !== '') {
+            // Clean header - trim whitespace
             headers.push(headerValue.toString().trim());
           } else {
-            headers.push(`Column${colNumber}`);
+            // Mark empty header columns as null so we can skip them later
+            headers.push(null);
           }
-        });
+        }
         
-        console.log(`Sheet "${sheetName}" headers:`, headers);
+        // Log only non-null headers
+        console.log(`Sheet "${sheetName}" headers:`, headers.filter(h => h !== null));
         
         // Process data rows (skip header row)
         let rowCount = 0;
@@ -137,22 +173,36 @@ function setupIPC() {
           const rowData = {};
           let hasData = false;
           
-          row.eachCell({ includeEmpty: false }, (cell, colNumber) => {
+          // ✅ FIXED: Use includeEmpty: true to process all columns
+          // This ensures column numbers match the header array indices
+          row.eachCell({ includeEmpty: true }, (cell, colNumber) => {
             const header = headers[colNumber - 1];
-            if (header) {
-              // Handle different cell value types
-              let cellValue = cell.value;
-              
-              // Handle rich text
-              if (cellValue && typeof cellValue === 'object' && cellValue.richText) {
-                cellValue = cellValue.richText.map(rt => rt.text).join('');
-              }
-              
-              // Handle formulas
-              if (cellValue && typeof cellValue === 'object' && cellValue.result !== undefined) {
-                cellValue = cellValue.result;
-              }
-              
+            
+            // Skip columns with null headers (empty header columns)
+            if (header === null || header === undefined) {
+              return;
+            }
+            
+            // Handle different cell value types
+            let cellValue = cell.value;
+            
+            // Handle rich text
+            if (cellValue && typeof cellValue === 'object' && cellValue.richText) {
+              cellValue = cellValue.richText.map(rt => rt.text).join('');
+            }
+            
+            // Handle formulas
+            if (cellValue && typeof cellValue === 'object' && cellValue.result !== undefined) {
+              cellValue = cellValue.result;
+            }
+            
+            // Handle dates
+            if (cell.type === ExcelJS.ValueType.Date && cellValue) {
+              cellValue = cellValue.toISOString();
+            }
+            
+            // Only add non-null, non-empty values
+            if (cellValue !== null && cellValue !== undefined && cellValue !== '') {
               rowData[header] = cellValue;
               hasData = true;
             }
@@ -176,6 +226,14 @@ function setupIPC() {
       // Log sample data from Trademark Config for debugging
       if (parsedData['Trademark Config'] && parsedData['Trademark Config'].length > 0) {
         console.log('Sample Trademark Config row:', parsedData['Trademark Config'][0]);
+      }
+      
+      // Verify critical sheets exist
+      if (parsedData['TTB Statements']) {
+        console.log(`✅ TTB Statements sheet found: ${parsedData['TTB Statements'].length} rows`);
+      }
+      if (parsedData['Brand Availability']) {
+        console.log(`✅ Brand Availability sheet found: ${parsedData['Brand Availability'].length} rows`);
       }
       
       return {
@@ -204,28 +262,27 @@ function setupIPC() {
   // ============================================
   ipcMain.handle('generate-copy', async (event, params) => {
     try {
-      console.log('Main Process: Generate copy request received:', params);
+      console.log('Generate copy request:', params);
       
       // Validate parameters
-      if (!params || !params.assetType || !params.countryCode || !Array.isArray(params.brandIds)) {
+      if (!params.assetType || !params.countryCode || !Array.isArray(params.brandIds)) {
         throw new Error('Invalid parameters for copy generation');
       }
-
-      // The actual copy generation happens in the renderer process
-      // This handler just validates and logs the request
-      // The frontend will call templateService.generateCopy() directly
       
-      console.log('Main Process: Copy generation parameters validated');
+      // TODO: Implement actual copy generation logic
+      // This is a placeholder that will be implemented in later artifacts
       
       return {
         success: true,
-        message: 'Copy generation request acknowledged',
         timestamp: new Date().toISOString(),
-        params: params
+        params: params,
+        generatedCopy: {
+          html: '<p>Generated copy will appear here</p>',
+          plainText: 'Generated copy will appear here'
+        }
       };
-      
     } catch (error) {
-      console.error('Main Process: Error in copy generation handler:', error);
+      console.error('Error generating copy:', error);
       return {
         success: false,
         error: error.message
@@ -293,24 +350,6 @@ function setupIPC() {
       };
     }
   });
-}
-
-// ============================================
-// EXCEL FILE PATH RESOLVER
-// ============================================
-function getExcelFilePath() {
-  if (isDev) {
-    // Development: use file from project data directory
-    const devPath = path.join(__dirname, '../../data/templates/EXTERNAL - Trademark Tool Data (1).xlsx');
-    console.log('Development Excel path:', devPath);
-    return devPath;
-  } else {
-    // Production: use file from resources
-    const resourcePath = process.resourcesPath || path.join(process.cwd(), 'resources');
-    const prodPath = path.join(resourcePath, 'data/templates/EXTERNAL - Trademark Tool Data (1).xlsx');
-    console.log('Production Excel path:', prodPath);
-    return prodPath;
-  }
 }
 
 // ============================================

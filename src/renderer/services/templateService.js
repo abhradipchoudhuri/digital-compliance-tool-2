@@ -1,7 +1,8 @@
 // src/renderer/services/templateService.js
-// Template Service - Manages copy templates and generation logic
+// Template Service - Manages copy templates and generation
 
 import copyGenerator from './copyGenerator';
+import excelService from './excelService';
 
 class TemplateService {
   constructor() {
@@ -23,9 +24,9 @@ class TemplateService {
       
       this.excelData = excelData;
       
-      // Initialize copy generator with Excel data
+      // Initialize copy generator with Excel data AND excelService reference
       console.log('TemplateService: Passing data to copyGenerator...');
-      copyGenerator.initialize(excelData);
+      copyGenerator.initialize(excelData, excelService);
       
       this.isInitialized = true;
       console.log('✅ TemplateService: Initialization complete');

@@ -1,32 +1,38 @@
 // src/renderer/services/excelService.js
-// Excel Service - FIXED to match your actual Excel column names
+// Excel Data Service - Handles loading and parsing Excel data
 
-export class ExcelService {
+class ExcelService {
   constructor() {
-    this.isLoaded = false;
     this.data = null;
     this.metadata = null;
+    this.isLoaded = false;
   }
 
+  /**
+   * Load Excel data from main process
+   */
   async loadData() {
     try {
       console.log('ExcelService: Starting Excel data load...');
       
+      // Check if we're in Electron environment
       if (!window.electronAPI) {
         throw new Error('Electron API not available');
       }
 
+      // Call main process to load Excel
       const result = await window.electronAPI.loadExcelData();
-      
+
       if (!result.success) {
         throw new Error(result.error || 'Failed to load Excel data');
       }
 
+      // Store the parsed data
       this.data = result.data;
       this.metadata = {
         filePath: result.filePath,
         sheetCount: result.sheetCount,
-        summary: result.summary || [],
+        summary: result.summary,
         loadedAt: new Date().toISOString()
       };
       this.isLoaded = true;
@@ -79,12 +85,12 @@ export class ExcelService {
   }
 
   // ============================================
-  // FIXED: Match YOUR actual Excel column names
+  // DATA RETRIEVAL METHODS
   // ============================================
 
   /**
    * Get brands from Trademark Config
-   * YOUR EXCEL COLUMNS: 'Display Names', 'Brand Names', 'Entity Names', 'Trademark Type'
+   * Columns: 'Display Names', 'Brand Names', 'Entity Names', 'Trademark Type', 'TTB Type'
    */
   getBrands() {
     if (!this.data || !this.data['Trademark Config']) {
@@ -93,17 +99,14 @@ export class ExcelService {
     }
     
     const brands = this.data['Trademark Config']
-      .filter(row => {
-        // Check different possible column name variations
-        const type = row['Trademark Type'] || row.Type || row.type || '';
-        return type.toLowerCase().includes('brand') || row['Brand Names'] || row['Display Names'];
-      })
       .map(row => ({
-        id: (row['Brand Names'] || row['Display Names'] || row.ID || '').toString().toLowerCase().replace(/[^a-z0-9]/g, '-'),
-        name: row['Display Names'] || row['Brand Names'] || row.Name || '',
-        entity: row['Entity Names'] || row.Entity || '',
+        id: (row['Brand Names'] || row['Display Names'] || '').toString().toLowerCase().replace(/[^a-z0-9]/g, '-'),
+        name: row['Display Names'] || row['Brand Names'] || '',
+        entity: row['Entity Names'] || '',
         brandNames: row['Brand Names'] || '',
-        displayNames: row['Display Names'] || ''
+        displayNames: row['Display Names'] || '',
+        trademarkType: row['Trademark Type'] || '',
+        ttbType: row['TTB Type'] || 'Full'
       }))
       .filter(brand => brand.name); // Only include rows with names
     
@@ -112,37 +115,21 @@ export class ExcelService {
   }
 
   /**
-   * Get asset types from Trademark Config
-   * YOUR EXCEL: Check 'Asset Type Instructions' column or 'Trademark Type'
+   * Get asset types from Overall Structure
+   * Columns: 'Asset Type', 'Structure'
    */
   getAssetTypes() {
     if (!this.data || !this.data['Overall Structure']) {
-      console.warn('⚠️ Overall Structure sheet not found, trying Trademark Config...');
-      
-      // Fallback: try to get from Trademark Config if Overall Structure missing
-      if (this.data && this.data['Trademark Config']) {
-        const assetTypes = this.data['Trademark Config']
-          .filter(row => row['Asset Type Instructions'])
-          .map(row => ({
-            id: (row['Asset Type Instructions'] || '').toString().toLowerCase().replace(/[^a-z0-9]/g, '-'),
-            name: row['Asset Type Instructions'] || '',
-            description: ''
-          }))
-          .filter(type => type.name);
-        
-        console.log(`📋 getAssetTypes(): Found ${assetTypes.length} asset types from Trademark Config`);
-        return assetTypes;
-      }
-      
+      console.warn('⚠️ Overall Structure sheet not found');
       return [];
     }
     
-    // Get from Overall Structure sheet (YOUR EXCEL: 'Asset Type' column)
+    // Get from Overall Structure sheet
     const assetTypes = this.data['Overall Structure']
       .map(row => ({
-        id: (row['Asset Type'] || row.AssetType || '').toString().toLowerCase().replace(/[^a-z0-9]/g, '-'),
-        name: row['Asset Type'] || row.AssetType || '',
-        description: row.Structure || row.Description || ''
+        id: (row['Asset Type'] || '').toString().toLowerCase().replace(/[^a-z0-9]/g, '-'),
+        name: row['Asset Type'] || '',
+        description: row.Structure || ''
       }))
       .filter(type => type.name);
     
@@ -152,8 +139,7 @@ export class ExcelService {
 
   /**
    * Get countries from CountryLanguage sheet
-   * YOUR EXCEL COLUMNS: 'Abbv', 'Country', 'Language'
-   * FIXED: Handles empty Abbv codes and multi-language countries
+   * Columns: 'Abbv', 'Country', 'Language'
    */
   getCountries() {
     if (!this.data || !this.data['CountryLanguage']) {
@@ -161,52 +147,181 @@ export class ExcelService {
       return [];
     }
     
-    const countries = [];
-    const countryCodes = new Set();
+    const uniqueCountries = new Map();
     
     this.data['CountryLanguage'].forEach(row => {
-      let code = row.Abbv || row.CountryCode || row['Country Code'];
+      const code = row.Abbv || row.CountryCode || row['Country Code'];
       const name = row.Country || row.CountryName || row['Country Name'];
       const language = row.Language || 'English';
       
-      // Handle empty codes: generate from country name
-      if (!code || code.trim() === '') {
-        // Special case for United States (Brown-Forman default market)
-        if (name && name.toLowerCase().includes('united states')) {
-          code = 'US';
-        } 
-        // Generate code from first 2 letters of country name
-        else if (name) {
-          code = name.substring(0, 2).toUpperCase();
+      if (code && !uniqueCountries.has(code)) {
+        uniqueCountries.set(code, {
+          code: code,
+          name: name || code,
+          language: language
+        });
+      } else if (code && uniqueCountries.has(code)) {
+        // Handle multi-language countries (like Belgium-French)
+        const existingName = uniqueCountries.get(code).name;
+        if (name && name !== existingName) {
+          // Create a variant entry
+          const variantCode = `${code}-${language.split(' ')[0].substring(0, 2).toUpperCase()}`;
+          uniqueCountries.set(variantCode, {
+            code: variantCode,
+            name: `${name} (${language})`,
+            language: language
+          });
+          console.log(`✅ Multi-language country: ${name} (${language}) → Code: ${variantCode}`);
         }
       }
-      
-      // Check if country name is empty
-      if (!name || name.trim() === '') {
-        console.log(`⚠️ SKIPPED ROW with code "${code}" - Empty country name`);
-        return;
-      }
-      
-      // Handle duplicate country codes by appending language suffix
-      let finalCode = code;
-      if (countryCodes.has(code)) {
-        // Extract language code from language string
-        const langAbbr = language.substring(0, 2).toUpperCase();
-        finalCode = `${code}-${langAbbr}`;
-        console.log(`✅ Multi-language country: ${name} (${language}) → Code: ${finalCode}`);
-      }
-      
-      countryCodes.add(code);
-      
-      countries.push({
-        code: finalCode,
-        name: name,
-        language: language
-      });
     });
     
+    const countries = Array.from(uniqueCountries.values());
     console.log(`📋 getCountries(): Found ${countries.length} countries (including multi-language variants)`);
     return countries;
+  }
+
+  /**
+   * Get TTB statement for a brand
+   * @param {string} brandName - Brand name to look up
+   * @param {string} ttbType - Type: Full, Tightened, or Limited Character
+   * @returns {string} TTB statement or empty string
+   */
+  getTTBStatement(brandName, ttbType = 'Full') {
+    if (!this.data || !this.data['TTB Statements']) {
+      console.warn('⚠️ TTB Statements sheet not found');
+      return '';
+    }
+
+    const ttbRow = this.data['TTB Statements'].find(row => 
+      row['Brand Name'] === brandName
+    );
+
+    if (!ttbRow) {
+      console.warn(`⚠️ No TTB statement found for brand: ${brandName}`);
+      return '';
+    }
+
+    // Get the appropriate TTB statement based on type
+    let statement = '';
+    if (ttbType === 'Full') {
+      statement = ttbRow['TTB Statement - Full'] || '';
+    } else if (ttbType === 'Tightened') {
+      statement = ttbRow['TTB Statement - Tightened'] || '';
+    } else if (ttbType === 'Limited Character') {
+      statement = ttbRow['TTB Statement - Limited Character'] || '';
+    } else {
+      // Default to Full if type not recognized
+      statement = ttbRow['TTB Statement - Full'] || '';
+    }
+
+    console.log(`📋 TTB Statement for ${brandName} (${ttbType}):`, statement.substring(0, 50) + '...');
+    return statement;
+  }
+
+  /**
+   * Get brands available in a specific country
+   * ✅ USES BRAND AVAILABILITY SHEET as designed
+   * ✅ FUZZY MATCHING to handle name variations between sheets
+   * @param {string} countryCode - Country code (e.g., 'US', 'CA', 'GB')
+   * @returns {Array} Array of brand objects available in that country
+   */
+  getBrandsForCountry(countryCode) {
+    if (!this.data || !this.data['Brand Availability']) {
+      console.warn('⚠️ Brand Availability sheet not found, returning all brands');
+      return this.getBrands();
+    }
+
+    // Helper function to normalize brand names for matching
+    // Handles variations like "Jack Daniel's Old No. 7" vs "Jack Daniel's Old N.7"
+    const normalizeBrandName = (name) => {
+      if (!name) return '';
+      return name
+        .toLowerCase()
+        .replace(/[^\w\s]/g, '') // Remove punctuation (apostrophes, periods, hyphens)
+        .replace(/\s+/g, ' ')    // Normalize multiple spaces to single space
+        .trim();
+    };
+
+    // Get all brands marked as available in this country from Brand Availability sheet
+    const availableBrandNames = this.data['Brand Availability']
+      .filter(row => {
+        const availableCountries = row['Available Countries'] || '';
+        
+        // If marked as "ALL", brand is available everywhere
+        if (availableCountries === 'ALL') {
+          return true;
+        }
+        
+        // Check if country code is in the comma-separated list
+        const countryList = availableCountries.split(',').map(c => c.trim());
+        return countryList.includes(countryCode);
+      })
+      .map(row => row['Brand Name']);
+
+    console.log(`📋 Brand Availability sheet has ${availableBrandNames.length} brands for ${countryCode}`);
+
+    // Get full brand data from Trademark Config
+    const allBrands = this.getBrands();
+    
+    // Create normalized lookup for matching
+    const normalizedAvailable = availableBrandNames.map(name => ({
+      original: name,
+      normalized: normalizeBrandName(name)
+    }));
+
+    // Match brands using fuzzy comparison to handle naming differences
+    const availableBrands = allBrands.filter(brand => {
+      const brandNormalized = normalizeBrandName(brand.name);
+      const brandNameNormalized = normalizeBrandName(brand.brandNames || '');
+      const displayNormalized = normalizeBrandName(brand.displayNames || '');
+      
+      // Check if this brand matches any available brand (normalized comparison)
+      const matches = normalizedAvailable.some(avail => {
+        // Try various matching strategies
+        return (
+          // Exact normalized match
+          brandNormalized === avail.normalized ||
+          brandNameNormalized === avail.normalized ||
+          displayNormalized === avail.normalized ||
+          // Contains match (for cases like "Jack Daniel's (FOB)" matching "Jack Daniel's Old No. 7")
+          brandNormalized.includes(avail.normalized) || 
+          avail.normalized.includes(brandNormalized) ||
+          brandNameNormalized.includes(avail.normalized) ||
+          avail.normalized.includes(brandNameNormalized) ||
+          displayNormalized.includes(avail.normalized) ||
+          avail.normalized.includes(displayNormalized)
+        );
+      });
+      
+      return matches;
+    });
+
+    console.log(`📋 getBrandsForCountry(${countryCode}): Matched ${availableBrands.length} brands from Trademark Config`);
+    
+    // Log which brands matched for debugging
+    if (availableBrands.length > 0 && availableBrands.length <= 20) {
+      console.log('✅ Matched brands:', availableBrands.map(b => b.name).join(', '));
+    }
+    
+    return availableBrands;
+  }
+
+  /**
+   * Get TTB Type for a brand from Trademark Config
+   * @param {string} brandName - Brand name
+   * @returns {string} TTB Type (Full/Tightened/Limited Character)
+   */
+  getTTBType(brandName) {
+    if (!this.data || !this.data['Trademark Config']) {
+      return 'Full'; // Default
+    }
+
+    const brandRow = this.data['Trademark Config'].find(row => 
+      row['Brand Names'] === brandName || row['Display Names'] === brandName
+    );
+
+    return brandRow?.['TTB Type'] || 'Full';
   }
 
   /**
@@ -344,76 +459,33 @@ export class ExcelService {
   }
 
   /**
-   * Get statistics - FIXED to always return valid object
+   * Get statistics
    */
   getStats() {
     const stats = {
       isLoaded: this.isLoaded,
       totalSheets: this.data ? Object.keys(this.data).length : 0,
-      totalBrands: this.getBrands().length,
-      totalCountries: this.getCountries().length,
-      totalAssetTypes: this.getAssetTypes().length,
-      loadedAt: this.metadata?.loadedAt || null,
-      filePath: this.metadata?.filePath || null
+      brands: this.isLoaded ? this.getBrands().length : 0,
+      countries: this.isLoaded ? this.getCountries().length : 0,
+      assetTypes: this.isLoaded ? this.getAssetTypes().length : 0,
+      loadedAt: this.metadata?.loadedAt || null
     };
     
-    console.log('📊 Stats:', stats);
     return stats;
   }
 
-  validateData() {
-    const requiredSheets = [
-      'Trademark Config',
-      'CountryLanguage',
-      'Trademark Language',
-      'Trademark Structure',
-      'Language Dependent Variables',
-      'Overall Structure',
-      'Help Text'
-    ];
-
-    const missingSheets = requiredSheets.filter(
-      sheet => !this.data || !this.data[sheet]
-    );
-
-    if (missingSheets.length > 0) {
-      return {
-        valid: false,
-        missingSheets: missingSheets,
-        message: `Missing required sheets: ${missingSheets.join(', ')}`
-      };
-    }
-
-    return {
-      valid: true,
-      message: 'All required sheets present'
-    };
-  }
-
-  getSheet(sheetName) {
-    return this.data?.[sheetName] || [];
-  }
-
-  getSheetNames() {
-    return this.data ? Object.keys(this.data) : [];
-  }
-
+  /**
+   * Reload data
+   */
   async reload() {
-    console.log('🔄 Reloading Excel data...');
-    this.isLoaded = false;
     this.data = null;
     this.metadata = null;
+    this.isLoaded = false;
     return await this.loadData();
-  }
-
-  clear() {
-    this.isLoaded = false;
-    this.data = null;
-    this.metadata = null;
-    console.log('🗑️ Excel data cleared');
   }
 }
 
-// Create and export singleton instance
+// ✅ Export both the class AND the singleton instance
+export { ExcelService };  // Named export for class (for 'new ExcelService()')
 const excelService = new ExcelService();
-export default excelService;
+export default excelService;  // Default export for singleton (for direct use)

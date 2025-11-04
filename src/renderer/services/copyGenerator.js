@@ -2,6 +2,7 @@
 // Core Copy Generation Engine - WITH ENHANCED TTB FUZZY MATCHING
 // ✅ FIXED: [object Object] issue with UGC Policy and other langVars
 // ✅ NEW: Uses "Website Legal Documents (Hyperlinks)" column from Excel
+// ✅ FIXED: Trademark line vanishing for single brands (data type mismatch)
 
 class CopyGenerator {
   constructor() {
@@ -13,6 +14,7 @@ class CopyGenerator {
     this.trademarkStructure = null;
     this.countryLanguage = null;
     this.ttbStatements = null;
+    this.usResponsibilityMessage = null;
     this.excelService = null;
     
     // ✅ ASSET TYPE → TTB TYPE MAPPING
@@ -40,9 +42,267 @@ class CopyGenerator {
       "Traditional | Retailer Advertising Specialty (ex. Gutter Mat)": "Full",
       "Traditional | Standard TV": "Full"
     };
+    
+    // ✅ ASSET TYPE → TRADEMARK STRUCTURE TYPE MAPPING
+    // Each asset type determines which trademark structure to use (Full/Tightened/Limited Character)
+    this.ASSET_TYPE_TO_TRADEMARK_TYPE = {
+      "Digital | Asset Dynamic Loop (GIF/Cinemagraph)": "Tightened",
+      "Digital | Asset Static (paid)": "Tightened",
+      "Digital | Asset Video (paid & organic)": "Full",
+      "Digital | Bio Facebook (About Section)": "Tightened",
+      "Digital | Bio Instagram": "Limited Character",
+      "Digital | Bio Pinterest": "Limited Character",
+      "Digital | Bio Twitter": "Limited Character",
+      "Digital | Email Footer": "Full",
+      "Digital | Email Header": "Full",
+      "Digital | Media - Digital TV (Streaming)": "Full",
+      "Digital | Media - Display Banner - Dynamic": "Limited Character",
+      "Digital | Media - Display Banner - Static": "Limited Character",
+      "Digital | Web Age-Gate Footer": "Full",
+      "Digital | Web Footer": "Full",
+      "Digital | eCommerce Content": "Tightened",
+      "Traditional & Digital | Out-of-Home (OOH)": "Full",
+      "Traditional & Digital | Radio/Podcast": "Tightened",
+      "Traditional | Consumer Advertising Specialty (ex. Keychain)": "Limited Character",
+      "Traditional | Consumer-Facing Print Media (ex. Magazine)": "Full",
+      "Traditional | Point of Sale (POS) - Signage, Print": "Full",
+      "Traditional | Retailer Advertising Specialty (ex. Gutter Mat)": "Full",
+      "Traditional | Standard TV": "Full"
+    };
   }
 
   // ✅ NEW HELPER: Safe value getter to prevent [object Object]
+  // ✅ NEW: Parse TTB statement to extract components
+  parseTTBStatement(ttbStatement) {
+    if (!ttbStatement) return null;
+    
+    // Pattern: "Class Type, ABV, Company/Location"
+    // Example: "Tennessee Whiskey, 40% Alc. by Vol., Jack Daniel Distillery, Lynchburg, TN"
+    
+    const parts = ttbStatement.split(',').map(p => p.trim());
+    
+    // Extract class type (first part)
+    const classType = parts[0] || '';
+    
+    // Extract ABV (look for percentage)
+    let abv = '';
+    let companyIndex = 1;
+    for (let i = 1; i < parts.length; i++) {
+      if (parts[i].includes('%') || parts[i].toLowerCase().includes('alc')) {
+        abv = parts[i];
+        companyIndex = i + 1;
+        break;
+      }
+    }
+    
+    // Extract company and location (everything after ABV)
+    const companyParts = parts.slice(companyIndex);
+    const company = companyParts.join(', ');
+    
+    return {
+      classType,
+      abv,
+      company,
+      full: ttbStatement
+    };
+  }
+
+  // ✅ NEW: Detect if brands are in the same portfolio
+  detectPortfolio(brandDataList) {
+    if (brandDataList.length < 2) return null;
+    
+    const brandNames = brandDataList.map(b => b['Brand Names'] || b['Display Names']);
+    
+    // Check for common portfolio prefixes
+    const portfolios = [
+      { name: 'Jack Daniel', distillery: 'Jack Daniel Distillery, Lynchburg, TN' },
+      { name: 'Old Forester', distillery: 'Old Forester Distilling Company' },
+      { name: 'Woodford Reserve', distillery: 'Woodford Reserve Distillery' }
+    ];
+    
+    for (const portfolio of portfolios) {
+      const allInPortfolio = brandNames.every(name => 
+        name && name.includes(portfolio.name)
+      );
+      if (allInPortfolio) {
+        console.log(`✅ Detected portfolio: ${portfolio.name}`);
+        return portfolio;
+      }
+    }
+    
+    return null;
+  }
+
+  // ✅ NEW: Build TTB section based on brand selection rules
+  // Updated to use new Excel columns: "+1 of different brands" and "+1 whitin JD Portfolio"
+  buildTTBSection(brandDataList, ttbType) {
+    console.log(`🔍 Building TTB section for ${brandDataList.length} brand(s), TTB Type: ${ttbType}`);
+    
+    if (brandDataList.length === 0) {
+      return '';
+    }
+    
+    // SCENARIO 1: Single Brand
+    if (brandDataList.length === 1) {
+      console.log('📋 Scenario 1: Single brand - Full TTB');
+      const brandData = brandDataList[0];
+      const brandName = brandData['Brand Names'] || brandData['Display Names'];
+      const displayName = brandData['Display Names'];
+      return this.getTTBStatement(brandName, ttbType, displayName);
+    }
+    
+    // For multiple brands, check if all are in the same entity/portfolio
+    const entities = [...new Set(brandDataList.map(b => b['Entity Names']).filter(Boolean))];
+    console.log(`📋 Unique entities: ${entities.join(', ')}`);
+    
+    // Get the first brand's TTB data to check for multi-brand columns
+    const firstBrandName = brandDataList[0]['Brand Names'] || brandDataList[0]['Display Names'];
+    const firstBrandDisplayName = brandDataList[0]['Display Names'];
+    const firstBrandTTBRow = this.getTTBRow(firstBrandName, firstBrandDisplayName);
+    
+    if (firstBrandTTBRow) {
+      // Check if all brands have the same entity (e.g., all are "Jack Daniel's")
+      if (entities.length === 1) {
+        const entity = entities[0];
+        console.log(`📋 All brands have same entity: ${entity}`);
+        
+        // Check for portfolio-specific TTB statement
+        const portfolioStatement = firstBrandTTBRow['+1 whitin JD Portfolio'] || 
+                                   firstBrandTTBRow['+1 within JD Portfolio'];
+        
+        if (portfolioStatement) {
+          console.log(`📋 Scenario 4: Same entity/portfolio - Using portfolio TTB from Excel`);
+          return portfolioStatement;
+        }
+      }
+      
+      // Check for different brands column ("+1 of different brands")
+      const differentBrandsStatement = firstBrandTTBRow['+1 of different brands'];
+      
+      // Check if all brands have the same class type
+      const ttbData = brandDataList.map(brandData => {
+        const brandName = brandData['Brand Names'] || brandData['Display Names'];
+        const displayName = brandData['Display Names'];
+        const statement = this.getTTBStatement(brandName, ttbType, displayName);
+        const parsed = this.parseTTBStatement(statement);
+        
+        return {
+          brandName,
+          statement,
+          parsed
+        };
+      }).filter(data => data.statement && data.parsed);
+      
+      const classTypes = ttbData.map(d => d.parsed.classType).filter(Boolean);
+      const uniqueClassTypes = [...new Set(classTypes)];
+      
+      // SCENARIO 2: Multiple Brands - Same Class
+      if (uniqueClassTypes.length === 1 && classTypes.length === ttbData.length) {
+        console.log('📋 Scenario 2: Multiple brands, same class - Class + ABV range + Company');
+        
+        const classType = uniqueClassTypes[0];
+        
+        // Extract ABV values and find range
+        const abvValues = ttbData
+          .map(d => d.parsed.abv)
+          .filter(Boolean)
+          .map(abv => {
+            const matches = abv.match(/(\d+\.?\d*)/g);
+            if (matches) {
+              return matches.map(m => parseFloat(m));
+            }
+            return [];
+          })
+          .flat();
+        
+        let abvRange = '';
+        if (abvValues.length > 0) {
+          const minABV = Math.min(...abvValues);
+          const maxABV = Math.max(...abvValues);
+          
+          if (minABV === maxABV) {
+            abvRange = `${minABV}% Alc./Vol.`;
+          } else {
+            abvRange = `${minABV}-${maxABV}% Alc./Vol.`;
+          }
+        }
+        
+        // Use the company from the first brand
+        const company = ttbData[0].parsed.company;
+        
+        // Build the combined statement
+        return `${classType}, ${abvRange}, ${company}`;
+      }
+      
+      // SCENARIO 3: Multiple Brands - Different Classes
+      if (differentBrandsStatement) {
+        console.log('📋 Scenario 3: Multiple brands, different classes - Using Excel different brands column');
+        return differentBrandsStatement;
+      }
+    }
+    
+    // Fallback: Use the company from the first brand
+    console.log('📋 Fallback: Using parsed company from first brand');
+    const firstStatement = this.getTTBStatement(firstBrandName, ttbType, firstBrandDisplayName);
+    const parsed = this.parseTTBStatement(firstStatement);
+    return parsed ? parsed.company : '';
+  }
+  
+  // ✅ NEW: Get the full TTB row for a brand
+  getTTBRow(brandName, displayName = null) {
+    if (!this.ttbStatements || this.ttbStatements.length === 0) {
+      return null;
+    }
+    
+    const aggressiveNormalize = (name) => {
+      if (!name) return '';
+      return name
+        .toLowerCase()
+        .trim()
+        .replace(/[^\w\s]/g, '')
+        .replace(/\bno\s+/g, 'n')
+        .replace(/\bn\s+/g, 'n')
+        .replace(/\bno\b/g, 'n')
+        .replace(/\s+/g, '');
+    };
+    
+    const tryMatch = (searchName) => {
+      if (!searchName) return null;
+      
+      const normalizedSearch = aggressiveNormalize(searchName);
+      
+      // Try exact match
+      let ttbRow = this.ttbStatements.find(row => {
+        const rowBrandName = row['Brand Name'] || row['Brand'] || row['BrandName'];
+        return rowBrandName === searchName;
+      });
+      if (ttbRow) return ttbRow;
+      
+      // Try normalized match
+      ttbRow = this.ttbStatements.find(row => {
+        const rowBrandName = row['Brand Name'] || row['Brand'] || row['BrandName'];
+        return aggressiveNormalize(rowBrandName) === normalizedSearch;
+      });
+      if (ttbRow) return ttbRow;
+      
+      // Try contains match
+      ttbRow = this.ttbStatements.find(row => {
+        const rowBrandName = row['Brand Name'] || row['Brand'] || row['BrandName'];
+        const rowNormalized = aggressiveNormalize(rowBrandName);
+        return rowNormalized.includes(normalizedSearch) || normalizedSearch.includes(rowNormalized);
+      });
+      
+      return ttbRow;
+    };
+    
+    let result = tryMatch(brandName);
+    if (!result && displayName && displayName !== brandName) {
+      result = tryMatch(displayName);
+    }
+    
+    return result;
+  }
+
   safeGetValue(value, fieldName = 'field') {
     // Handle null/undefined
     if (value === null || value === undefined) {
@@ -90,6 +350,7 @@ class CopyGenerator {
     this.trademarkLanguage = excelData['Trademark Language'] || [];
     this.countryLanguage = excelData['CountryLanguage'] || [];
     this.ttbStatements = excelData['TTB Statements'] || [];
+    this.usResponsibilityMessage = excelData['US Responsibility Message'] || [];
     
     this.excelService = excelService;
 
@@ -100,7 +361,8 @@ class CopyGenerator {
       languageData: this.languageData.length,
       trademarkLanguage: this.trademarkLanguage.length,
       countryLanguage: this.countryLanguage.length,
-      ttbStatements: this.ttbStatements.length
+      ttbStatements: this.ttbStatements.length,
+      usResponsibilityMessage: this.usResponsibilityMessage.length
     });
 
     if (this.ttbStatements.length > 0) {
@@ -469,39 +731,26 @@ class CopyGenerator {
       console.log('✅ Replaced: Responsibility Language');
     }
 
+    // ✅ NEW TTB LOGIC: Handle 4 scenarios based on brand selection
     if (copyText.includes('<<TTB>>')) {
       console.log('🔍 Found <<TTB>> placeholder in template');
       console.log('🌍 Country check: Is US?', countryCode === 'US');
       
       if (countryCode === 'US') {
-        console.log('✅ US detected - building TTB statements...');
+        console.log('✅ US detected - building TTB section with new multi-brand logic...');
         
-        const ttbStatements = [];
+        // Use new buildTTBSection method that handles all 4 scenarios
+        const ttbSection = this.buildTTBSection(brandDataList, ttbType);
         
-        for (const brandData of brandDataList) {
-          const brandName = brandData['Brand Names'] || brandData['Display Names'];
-          const displayName = brandData['Display Names'];
-          
-          console.log(`🔍 Processing brand: "${brandName}" with TTB Type: "${ttbType}" (from Asset Type: ${assetType})`);
-          
-          const ttbStatement = this.getTTBStatement(brandName, ttbType, displayName);
-          
-          if (ttbStatement) {
-            ttbStatements.push(ttbStatement);
-            console.log(`✅ Added TTB statement for ${brandName}`);
-          } else {
-            console.warn(`⚠️ No TTB statement found for ${brandName}`);
-          }
-        }
-
-        if (ttbStatements.length > 0) {
-          const ttbSection = '<br><br>' + ttbStatements.join('<br><br>') + '<br><br>';
-          copyText = copyText.replace(/<<TTB>>/g, ttbSection);
-          console.log(`✅ Replaced <<TTB>> with ${ttbStatements.length} statement(s)`);
-          console.log('📋 TTB Section preview:', ttbSection.substring(0, 200) + '...');
+        if (ttbSection) {
+          // Wrap with line breaks
+          const formattedTTB = '<br><br>' + ttbSection + '<br><br>';
+          copyText = copyText.replace(/<<TTB>>/g, formattedTTB);
+          console.log(`✅ Replaced <<TTB>>`);
+          console.log('📋 TTB Section:', ttbSection);
         } else {
           copyText = copyText.replace(/<<TTB>>/g, '');
-          console.warn('⚠️ No TTB statements found for any selected brands - placeholder removed');
+          console.warn('⚠️ No TTB section generated - placeholder removed');
         }
       } else {
         copyText = copyText.replace(/<<TTB>>/g, '');
@@ -512,7 +761,7 @@ class CopyGenerator {
     }
 
     if (copyText.includes('<<Trademark>>')) {
-      const trademarkSection = this.buildTrademarkSection(brandDataList, language);
+      const trademarkSection = this.buildTrademarkSection(brandDataList, language, assetType, countryCode);
       copyText = copyText.replace(/<<Trademark>>/g, trademarkSection);
       console.log('✅ Replaced: Trademark');
     }
@@ -694,50 +943,334 @@ class CopyGenerator {
     };
   }
 
-  buildTrademarkSection(brandDataList, language) {
+  buildTrademarkSection(brandDataList, language, assetType, countryCode) {
     const currentYear = new Date().getFullYear();
-    const trademarkParts = [];
-
-    const tmLangData = this.trademarkLanguage.find(tl => 
-      tl['Language'] === language
-    );
-
-    for (const brandData of brandDataList) {
-      const trademarkType = brandData['Trademark Type'] || 'Full';
-      
-      const tmStructure = this.trademarkStructure.find(ts => 
-        ts['Type of Trademark'] === trademarkType
-      );
-
-      if (!tmStructure) {
-        console.warn(`⚠️ No trademark structure found for type: ${trademarkType}`);
-        continue;
-      }
-
-      let tmText = tmStructure.Structure || '';
-
-      tmText = tmText.replace(/<<Brand>>/g, brandData['Brand Names'] || brandData['Display Names']);
-      tmText = tmText.replace(/<<Entity>>/g, brandData['Entity Names'] || '');
-      tmText = tmText.replace(/<<Year>>/g, currentYear.toString());
-      tmText = tmText.replace(/<<Pre-Brand>>/g, '');
-
-      if (tmLangData && tmLangData['Registered Language']) {
-        const registeredLang = tmLangData['Registered Language'];
-        tmText = tmText.replace(/<<Registered Language>>/g, registeredLang);
-      } else {
-        tmText = tmText.replace(/<<Registered Language>>/g, '');
-      }
-
-      if (tmLangData && tmLangData['Reserve Language ']) {
-        tmText = tmText.replace(/<<Reserve Language>>/g, tmLangData['Reserve Language '] || '');
-      } else {
-        tmText = tmText.replace(/<<Reserve Language>>/g, '');
-      }
-
-      trademarkParts.push(tmText.trim());
+    
+    if (brandDataList.length === 0) {
+      return '';
     }
+    
+    console.log(`🏷️ Building trademark section for ${brandDataList.length} brand(s), Language: ${language}, Asset Type: ${assetType}`);
+    
+    // ✅ CRITICAL FIX: Use NUMBER 1 instead of STRING '1' for single brand
+    // Excel has Singular vs Plural = 1 (number) for single brand, not '1' (string)
+    // This was causing the lookup to fail and trademark line to vanish!
+    const singularOrPlural = brandDataList.length === 1 ? 1 : '1+';
+    
+    // Get the appropriate Trademark Language row
+    const tmLangData = this.trademarkLanguage.find(tl => 
+      tl['Language'] === language && tl['Singular vs Plural'] === singularOrPlural
+    );
+    
+    if (!tmLangData) {
+      console.warn(`⚠️ No trademark language found for: ${language} (${singularOrPlural})`);
+      return '';
+    }
+    
+    console.log(`📋 Using trademark language: ${language} (${singularOrPlural})`);
+    
+    // Check if we need to prepend portfolio name for single brand
+    let usePortfolioForSingle = false;
+    if (brandDataList.length === 1) {
+      const brandData = brandDataList[0];
+      const brandName = brandData['Brand Names'] || brandData['Display Names'];
+      const entityName = brandData['Entity Names'] || '';
+      
+      // If entity is a portfolio and not in brand name, we'll prepend it, so use plural
+      if (entityName && entityName !== 'Brown-Forman Corporation' && entityName !== 'Brown-Forman') {
+        if (!brandName.includes(entityName)) {
+          usePortfolioForSingle = true;
+          console.log(`📋 Single brand will use portfolio prefix, switching to plural form`);
+        }
+      }
+    }
+    
+    // If single brand needs portfolio prefix, use plural form instead
+    const effectiveSingularOrPlural = usePortfolioForSingle ? '1+' : singularOrPlural;
+    
+    // Get the appropriate Trademark Language row (might be different if we're using plural for single brand)
+    const effectiveTmLangData = usePortfolioForSingle 
+      ? this.trademarkLanguage.find(tl => tl['Language'] === language && tl['Singular vs Plural'] === '1+')
+      : tmLangData;
+    
+    if (!effectiveTmLangData) {
+      console.warn(`⚠️ No trademark language found for: ${language} (${effectiveSingularOrPlural})`);
+      return '';
+    }
+    
+    // ✅ FIX: Use the ASSET_TYPE_TO_TRADEMARK_TYPE mapping based on the selected asset type
+    const trademarkType = this.ASSET_TYPE_TO_TRADEMARK_TYPE[assetType] || 'Full';
+    
+    console.log(`📋 Trademark structure type from asset type mapping: ${trademarkType}`);
+    
+    // Get the trademark structure
+    const tmStructure = this.trademarkStructure.find(ts => 
+      ts['Type of Trademark'] === trademarkType
+    );
+    
+    if (!tmStructure) {
+      console.warn(`⚠️ No trademark structure found for type: ${trademarkType}`);
+      return '';
+    }
+    
+    console.log(`📋 Using trademark structure: ${trademarkType}`);
+    console.log(`📋 Structure template: ${tmStructure.Structure}`);
+    
+    // Build the trademark text based on singular or plural
+    let trademarkText = '';
+    
+    if (brandDataList.length === 1) {
+      // SINGULAR: Brand is a registered trademark. ©2025 Entity. All rights reserved.
+      // OR if portfolio prefix needed: Jack Daniel's and Old No.7 are registered trademarks.
+      const brandData = brandDataList[0];
+      let brandName = brandData['Brand Names'] || brandData['Display Names'];
+      const entityName = brandData['Entity Names'] || '';
+      const preBrand = this.safeGetValue(effectiveTmLangData['Pre-Brand'], 'Pre-Brand');
+      
+      // ✅ FIX: For single brand, if entity is a portfolio and not in brand name, prepend it
+      if (usePortfolioForSingle) {
+        // Build brand list with portfolio name: "Jack Daniel's and Old No.7"
+        const conjunction = this.safeGetValue(effectiveTmLangData['Conjuction'], 'Conjuction') || 'and';
+        brandName = `${entityName} ${conjunction} ${brandName}`;
+        console.log(`📋 Single brand with portfolio: "${brandName}"`);
+      }
+      
+      // Build using structure template
+      trademarkText = tmStructure.Structure;
+      
+      // Replace placeholders
+      trademarkText = trademarkText.replace(/<<Pre-Brand>>/g, preBrand);
+      trademarkText = trademarkText.replace(/<<Brand>>/g, brandName);
+      trademarkText = trademarkText.replace(/<<Registered Language>>/g, 
+        this.safeGetValue(effectiveTmLangData['Registered Language'], 'Registered Language'));
+      trademarkText = trademarkText.replace(/<<Year>>/g, currentYear.toString());
+      trademarkText = trademarkText.replace(/<<Entity>>/g, entityName);
+      
+      // ✅ Insert Third Party info (Column E) BEFORE Reserve Language if it exists
+      const thirdParty = brandData['Third Party'];
+      const reserveLanguage = this.safeGetValue(
+        effectiveTmLangData['Reserve Language '] || effectiveTmLangData['Reserve Language'], 
+        'Reserve Language'
+      );
+      
+      if (thirdParty && thirdParty.trim()) {
+        // Insert Third Party before Reserve Language
+        const reserveWithThirdParty = thirdParty.trim() + ' ' + reserveLanguage;
+        trademarkText = trademarkText.replace(/<<Reserve Language>>/g, reserveWithThirdParty);
+        console.log(`📋 Added Third Party info before Reserve Language: ${thirdParty}`);
+      } else {
+        trademarkText = trademarkText.replace(/<<Reserve Language>>/g, reserveLanguage);
+      }
+      
+      // Clean up extra spaces
+      trademarkText = trademarkText.replace(/\s+/g, ' ').trim();
+      
+      console.log(`✅ Singular trademark: ${trademarkText}`);
+      
+      // ✅ NEW: Add US Responsibility Message for USA only
+      console.log(`🔍 Checking US RMD conditions: countryCode=${countryCode}, hasSheet=${!!this.usResponsibilityMessage}, sheetLength=${this.usResponsibilityMessage?.length || 0}`);
+      
+      if (countryCode === 'US' && this.usResponsibilityMessage && this.usResponsibilityMessage.length > 0) {
+        const originalBrandName = brandData['Brand Names'] || brandData['Display Names'];
+        console.log(`🔍 Looking up US RMD for brand: "${originalBrandName}"`);
+        const usRMD = this.getUSResponsibilityMessage(originalBrandName);
+        if (usRMD) {
+          trademarkText += ' ' + usRMD;
+          console.log(`✅ Added US Responsibility Message: ${usRMD}`);
+        } else {
+          console.warn(`⚠️ No US RMD found for: ${originalBrandName}`);
+        }
+      } else {
+        if (countryCode !== 'US') {
+          console.log(`ℹ️ Skipping US RMD - not US country (country: ${countryCode})`);
+        } else {
+          console.warn(`⚠️ Skipping US RMD - sheet not loaded properly`);
+        }
+      }
+      
+    } else {
+      // PLURAL: Brand1, Brand2 and Brand3 are registered trademarks. ©2025 Entity1. ©2025 Entity2. All rights reserved.
+      
+      // Check if all brands have the same entity (e.g., all are "Jack Daniel's")
+      const entities = [...new Set(brandDataList.map(b => b['Entity Names']).filter(Boolean))];
+      const sameEntity = entities.length === 1;
+      const portfolioEntity = sameEntity ? entities[0] : null;
+      
+      console.log(`📋 Same entity check: ${sameEntity}, Entity: ${portfolioEntity}`);
+      
+      // Get all brand names
+      let brandNames = brandDataList.map(b => b['Brand Names'] || b['Display Names']);
+      
+      // If all brands are from the same portfolio entity, prepend the entity name
+      if (portfolioEntity && portfolioEntity !== 'Brown-Forman Corporation' && portfolioEntity !== 'Brown-Forman') {
+        // Check if the portfolio entity is not already in the brand names
+        const portfolioInBrands = brandNames.some(name => name.includes(portfolioEntity));
+        if (!portfolioInBrands) {
+          // Prepend the portfolio entity to the brand list
+          brandNames = [portfolioEntity, ...brandNames];
+          console.log(`📋 Prepended portfolio entity "${portfolioEntity}" to brand list`);
+        }
+      }
+      
+      // Get conjunction (e.g., "and" for English, "y" for Spanish)
+      const conjunction = this.safeGetValue(effectiveTmLangData['Conjuction'], 'Conjuction') || 'and';
+      
+      // Build brand list: "Brand1, Brand2 and Brand3"
+      let brandList = '';
+      if (brandNames.length === 2) {
+        // Two brands: "Brand1 and Brand2"
+        brandList = `${brandNames[0]} ${conjunction} ${brandNames[1]}`;
+      } else {
+        // Three or more: "Brand1, Brand2, Brand3 and Brand4"
+        brandList = brandNames.slice(0, -1).join(', ') + ` ${conjunction} ${brandNames[brandNames.length - 1]}`;
+      }
+      
+      console.log(`📋 Brand list: ${brandList}`);
+      console.log(`📋 Entities: ${entities.join(', ')}`);
+      
+      // ✅ MODIFICATION 2: Build entity copyrights based on whether brands are from same portfolio
+      let entityCopyrights = '';
+      
+      // If all brands are from the same entity (e.g., all Jack Daniel's brands)
+      if (sameEntity && portfolioEntity && portfolioEntity !== 'Brown-Forman Corporation' && portfolioEntity !== 'Brown-Forman') {
+        // Use the portfolio entity: "©2025 Jack Daniel's."
+        entityCopyrights = `©${currentYear} ${portfolioEntity}.`;
+        console.log(`📋 Same portfolio - using single entity: ${portfolioEntity}`);
+      } else {
+        // Multiple different brands/entities - use consolidated Brown-Forman copyright
+        // Find Brown-Forman entity (could be "Brown-Forman" or "Brown-Forman Corporation")
+        const brownFormanEntity = entities.find(e => 
+          e === 'Brown-Forman' || e === 'Brown-Forman Corporation'
+        ) || 'Brown-Forman';
+        
+        entityCopyrights = `©${currentYear} ${brownFormanEntity}.`;
+        console.log(`📋 Different brands - using consolidated entity: ${brownFormanEntity}`);
+      }
+      
+      // Get pre-brand if exists
+      const preBrand = this.safeGetValue(effectiveTmLangData['Pre-Brand'], 'Pre-Brand');
+      
+      // Get registered language (plural form)
+      const registeredLanguage = this.safeGetValue(effectiveTmLangData['Registered Language'], 'Registered Language');
+      
+      // Get reserve language (appears once at the end)
+      const reserveLanguage = this.safeGetValue(
+        effectiveTmLangData['Reserve Language '] || effectiveTmLangData['Reserve Language'], 
+        'Reserve Language'
+      );
+      
+      console.log(`📋 Reserve Language value: "${reserveLanguage}"`);
+      
+      // Build the complete trademark text
+      const parts = [];
+      
+      if (preBrand) {
+        parts.push(preBrand);
+      }
+      
+      parts.push(brandList);
+      parts.push(registeredLanguage);
+      parts.push(entityCopyrights);
+      
+      if (reserveLanguage) {
+        parts.push(reserveLanguage);
+      }
+      
+      // Join with spaces and clean up
+      trademarkText = parts.join(' ').replace(/\s+/g, ' ').trim();
+      
+      console.log(`✅ Plural trademark: ${trademarkText}`);
+      
+      // ✅ NEW: Add US Responsibility Message for USA only (multiple brands)
+      console.log(`🔍 Multiple brands - Checking US RMD: countryCode=${countryCode}`);
+      if (countryCode === 'US') {
+        trademarkText += ' Please Drink Responsibly.';
+        console.log(`✅ Added US Responsibility Message (multiple brands): Please Drink Responsibly.`);
+      } else {
+        console.log(`ℹ️ Skipping US RMD - not US country (country: ${countryCode})`);
+      }
+    }
+    
+    return trademarkText;
+  }
 
-    return trademarkParts.join(' ');
+  getUSResponsibilityMessage(brandName) {
+    if (!this.usResponsibilityMessage || this.usResponsibilityMessage.length === 0) {
+      console.warn('⚠️ US Responsibility Message sheet is empty or not loaded');
+      return '';
+    }
+    
+    console.log(`🔍 Looking up US RMD for: "${brandName}"`);
+    
+    // Aggressive normalize function to handle all variations
+    const normalize = (name) => {
+      if (!name) return '';
+      return name
+        .toLowerCase()
+        .trim()
+        .replace(/jack\s+daniel'?s?\s*/gi, '')  // Remove "Jack Daniel's" prefix
+        .replace(/\bno\.?\s*/gi, 'no')          // "No.7" or "No. 7" -> "no7"
+        .replace(/\bn\.?\s*/gi, 'n')            // "N.7" or "N. 7" -> "n7"
+        .replace(/[^\w]/g, '')                   // Remove all punctuation
+        .replace(/\s+/g, '');                    // Remove spaces
+    };
+    
+    const normalizedSearch = normalize(brandName);
+    console.log(`   Normalized search: "${normalizedSearch}"`);
+    
+    // Try exact match first (unlikely to work but quick)
+    let usRMDRow = this.usResponsibilityMessage.find(row => {
+      const rowBrandName = row['Brand Name'];
+      return rowBrandName === brandName;
+    });
+    
+    if (usRMDRow) {
+      console.log(`✅ Found US RMD (exact match): ${usRMDRow['US RMD']}`);
+      return usRMDRow['US RMD'] || '';
+    }
+    
+    // Try normalized match - this should catch most variations
+    usRMDRow = this.usResponsibilityMessage.find(row => {
+      const rowBrandName = row['Brand Name'];
+      if (!rowBrandName) return false;
+      const rowNormalized = normalize(rowBrandName);
+      const matches = rowNormalized === normalizedSearch;
+      if (matches) {
+        console.log(`   Matched "${rowBrandName}" -> normalized: "${rowNormalized}"`);
+      }
+      return matches;
+    });
+    
+    if (usRMDRow) {
+      console.log(`✅ Found US RMD (normalized match): ${usRMDRow['US RMD']}`);
+      return usRMDRow['US RMD'] || '';
+    }
+    
+    // Try fuzzy contains match
+    usRMDRow = this.usResponsibilityMessage.find(row => {
+      const rowBrandName = row['Brand Name'];
+      if (!rowBrandName) return false;
+      const rowNormalized = normalize(rowBrandName);
+      
+      // Check if one contains the other
+      const matches = normalizedSearch.length >= 3 && rowNormalized.length >= 3 && 
+                     (normalizedSearch.includes(rowNormalized) || rowNormalized.includes(normalizedSearch));
+      
+      if (matches) {
+        console.log(`   Fuzzy matched "${rowBrandName}" -> normalized: "${rowNormalized}"`);
+      }
+      return matches;
+    });
+    
+    if (usRMDRow) {
+      console.log(`✅ Found US RMD (fuzzy match): ${usRMDRow['US RMD']}`);
+      return usRMDRow['US RMD'] || '';
+    }
+    
+    console.warn(`❌ No US Responsibility Message found for brand: "${brandName}"`);
+    console.warn(`   Normalized: "${normalizedSearch}"`);
+    console.warn(`   First 5 available: ${this.usResponsibilityMessage.slice(0, 5).map(r => `"${r['Brand Name']}" (norm: "${normalize(r['Brand Name'])}")`).join(', ')}`);
+    return '';
   }
 
   getForwardNotice(brandDataList, langVars) {

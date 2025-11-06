@@ -118,7 +118,6 @@ function getExcelFilePath() {
 function setupIPC() {
   // ============================================
   // EXCEL DATA LOADING WITH FIXED PARSER
-  // ✅ FIXED: Handles empty columns properly
   // ============================================
   ipcMain.handle('load-excel-data', async () => {
     try {
@@ -173,7 +172,7 @@ function setupIPC() {
           const rowData = {};
           let hasData = false;
           
-          // ✅ FIXED: Use includeEmpty: true to process all columns
+          
           // This ensures column numbers match the header array indices
           row.eachCell({ includeEmpty: true }, (cell, colNumber) => {
             const header = headers[colNumber - 1];

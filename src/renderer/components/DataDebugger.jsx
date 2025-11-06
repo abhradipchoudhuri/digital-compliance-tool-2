@@ -69,7 +69,7 @@ const DataDebugger = () => {
         <div className="flex items-center space-x-3">
           <Database className="w-8 h-8" />
           <div>
-            <h2 className="text-2xl font-bold">📊 Excel Data Debugger</h2>
+            <h2 className="text-2xl font-bold"> Excel Data Debugger</h2>
             <p className="text-sm opacity-90">Inspect loaded Excel data structure and values</p>
           </div>
         </div>

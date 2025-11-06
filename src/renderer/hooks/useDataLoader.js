@@ -17,21 +17,21 @@ export const useDataLoader = () => {
       
       setData(loadedData);
       console.log('useDataLoader: Data loaded successfully');
-      console.log('📊 Excel Data Structure:', Object.keys(loadedData));
+      console.log('Excel Data Structure:', Object.keys(loadedData));
       
       // CRITICAL: Extract actual Excel data from the response object
       // excelService.loadData() returns { success, data, metadata }
       // We need to pass just the 'data' property to templateService
       const actualExcelData = loadedData.data || loadedData;
-      console.log('🔍 Actual Excel sheets:', Object.keys(actualExcelData));
+      console.log('Actual Excel sheets:', Object.keys(actualExcelData));
       
-      console.log('🔧 useDataLoader: Initializing templateService with Excel data...');
+      console.log('useDataLoader: Initializing templateService with Excel data...');
       const initResult = await templateService.initialize(actualExcelData);
       
       if (initResult.success) {
-        console.log('✅ useDataLoader: TemplateService initialized successfully!');
+        console.log('useDataLoader: TemplateService initialized successfully!');
       } else {
-        console.error('❌ useDataLoader: TemplateService initialization failed:', initResult.error);
+        console.error('useDataLoader: TemplateService initialization failed:', initResult.error);
         throw new Error(`Template service initialization failed: ${initResult.error}`);
       }
       
@@ -55,7 +55,7 @@ export const useDataLoader = () => {
       
       // Re-initialize templateService after reload
       await templateService.initialize(actualExcelData);
-      console.log('✅ useDataLoader: Data and templateService reloaded');
+      console.log('useDataLoader: Data and templateService reloaded');
       
     } catch (err) {
       setError(err.message);

@@ -1,18 +1,25 @@
 // src/renderer/index.js
+// Main Application Entry Point
+// Handles Excel data loading, context provision, and application initialization
+
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import './styles/globals.css';
 import App from './App';
-
-// ✅ Import excelService singleton directly
 import excelService from './services/excelService';
 
-// Import Logger with fallback
+// ============================================
+// LOGGER INITIALIZATION
+// ============================================
+
+/**
+ * Initialize logger with fallback to console
+ */
 let Logger;
 try {
   Logger = require('./utils/logger').Logger;
 } catch (e) {
-  console.warn('Logger not found, using console');
+  console.warn('Logger not found, using console fallback');
   Logger = class {
     constructor(name) {
       this.name = name;
@@ -25,9 +32,21 @@ try {
 
 const logger = new Logger('App');
 
-// ===== EXCEL DATA CONTEXT =====
+// ============================================
+// EXCEL DATA CONTEXT
+// ============================================
+
+/**
+ * React Context for Excel data
+ * Provides access to Excel data throughout the application
+ */
 const ExcelDataContext = React.createContext(null);
 
+/**
+ * Custom hook to access Excel data context
+ * @returns {Object} Excel data context with helper methods
+ * @throws {Error} If used outside of ExcelDataProvider
+ */
 export const useExcelData = () => {
   const context = React.useContext(ExcelDataContext);
   if (!context) {
@@ -36,13 +55,24 @@ export const useExcelData = () => {
   return context;
 };
 
+/**
+ * Excel Data Provider Component
+ * Wraps the application and provides Excel data through context
+ * @param {Object} props - Component props
+ * @param {React.ReactNode} props.children - Child components
+ * @param {Object} props.data - Excel data object
+ */
 const ExcelDataProvider = ({ children, data }) => {
   const contextValue = {
     rawData: data,
     
+    /**
+     * Get all brands from Trademark Config
+     * @returns {Array<Object>} Array of brand objects
+     */
     getBrands: () => {
       if (!data || !data['Trademark Config']) {
-        console.warn('⚠️ Trademark Config not available');
+        console.warn('Trademark Config not available');
         return [];
       }
       
@@ -59,9 +89,13 @@ const ExcelDataProvider = ({ children, data }) => {
         .filter(brand => brand.name);
     },
     
+    /**
+     * Get all countries from CountryLanguage
+     * @returns {Array<Object>} Array of country objects
+     */
     getCountries: () => {
       if (!data || !data['CountryLanguage']) {
-        console.warn('⚠️ CountryLanguage not available');
+        console.warn('CountryLanguage not available');
         return [];
       }
       
@@ -84,9 +118,13 @@ const ExcelDataProvider = ({ children, data }) => {
       return Array.from(uniqueCountries.values());
     },
     
+    /**
+     * Get all asset types from Overall Structure
+     * @returns {Array<Object>} Array of asset type objects
+     */
     getAssetTypes: () => {
       if (!data || !data['Overall Structure']) {
-        console.warn('⚠️ Overall Structure not available');
+        console.warn('Overall Structure not available');
         return [];
       }
       
@@ -107,7 +145,14 @@ const ExcelDataProvider = ({ children, data }) => {
   );
 };
 
-// ===== APP WRAPPER WITH EXCEL LOADING =====
+// ============================================
+// APP WRAPPER COMPONENT
+// ============================================
+
+/**
+ * App Wrapper Component
+ * Handles Excel data loading and application initialization
+ */
 class AppWrapper extends React.Component {
   constructor(props) {
     super(props);
@@ -117,10 +162,12 @@ class AppWrapper extends React.Component {
       excelData: null,
       mode: 'unknown'
     };
-    // ✅ Use the singleton instance directly
     this.excelService = excelService;
   }
 
+  /**
+   * Component lifecycle: Initialize application on mount
+   */
   async componentDidMount() {
     try {
       logger.info('Initializing Digital Compliance Tool...');
@@ -143,6 +190,10 @@ class AppWrapper extends React.Component {
     }
   }
 
+  /**
+   * Load Excel data from main process
+   * Falls back to mock data if loading fails
+   */
   async loadExcelData() {
     try {
       logger.info('Attempting to load Excel data...');
@@ -150,21 +201,21 @@ class AppWrapper extends React.Component {
       const result = await this.excelService.loadData();
       
       if (result.success) {
-        logger.info('✅ Excel data loaded successfully');
+        logger.info('Excel data loaded successfully');
         logger.info('Available sheets:', Object.keys(result.data));
         
-        // ✅ CRITICAL: Initialize templateService with Excel data
+        // Initialize templateService with Excel data
         try {
           const templateService = require('./services/templateService').default;
           const initResult = await templateService.initialize(result.data);
           
           if (initResult.success) {
-            logger.info('✅ TemplateService initialized successfully');
+            logger.info('TemplateService initialized successfully');
           } else {
-            logger.warn('⚠️ TemplateService initialization failed:', initResult.error);
+            logger.warn('TemplateService initialization failed:', initResult.error);
           }
         } catch (tsError) {
-          logger.error('❌ Error initializing TemplateService:', tsError);
+          logger.error('Error initializing TemplateService:', tsError);
         }
         
         this.setState({
@@ -173,7 +224,7 @@ class AppWrapper extends React.Component {
           error: null
         });
       } else {
-        logger.warn('⚠️ Excel data not available:', result.error);
+        logger.warn('Excel data not available:', result.error);
         
         this.setState({
           isLoading: false,
@@ -192,6 +243,10 @@ class AppWrapper extends React.Component {
     }
   }
 
+  /**
+   * Get mock data for demo/development mode
+   * @returns {Object} Mock Excel data structure
+   */
   getMockData() {
     return {
       'Trademark Config': [
@@ -236,6 +291,9 @@ class AppWrapper extends React.Component {
     };
   }
 
+  /**
+   * Render the application
+   */
   render() {
     const { isLoading, error, excelData, mode } = this.state;
 
@@ -259,7 +317,7 @@ class AppWrapper extends React.Component {
       <div>
         {error && (
           <div className="bg-yellow-500 text-yellow-900 px-4 py-2 text-sm font-medium">
-            ⚠️ {mode === 'browser' ? 'Browser Dev Mode' : 'Demo Mode'}: {error}
+            Warning: {mode === 'browser' ? 'Browser Dev Mode' : 'Demo Mode'}: {error}
           </div>
         )}
         
@@ -271,21 +329,41 @@ class AppWrapper extends React.Component {
   }
 }
 
-// ===== ERROR BOUNDARY =====
+// ============================================
+// ERROR BOUNDARY COMPONENT
+// ============================================
+
+/**
+ * Error Boundary Component
+ * Catches and displays React errors gracefully
+ */
 class ErrorBoundary extends React.Component {
   constructor(props) {
     super(props);
     this.state = { hasError: false, error: null };
   }
 
+  /**
+   * Update state when an error is caught
+   * @param {Error} error - The error that was thrown
+   * @returns {Object} New state
+   */
   static getDerivedStateFromError(error) {
     return { hasError: true, error: error.message };
   }
 
+  /**
+   * Log error details when caught
+   * @param {Error} error - The error that was thrown
+   * @param {Object} errorInfo - Additional error information
+   */
   componentDidCatch(error, errorInfo) {
     logger.error('Error caught:', error, errorInfo);
   }
 
+  /**
+   * Render error UI or children
+   */
   render() {
     if (this.state.hasError) {
       return (
@@ -314,7 +392,13 @@ class ErrorBoundary extends React.Component {
   }
 }
 
-// ===== RENDER =====
+// ============================================
+// APPLICATION INITIALIZATION
+// ============================================
+
+/**
+ * Initialize and render the application
+ */
 const root = ReactDOM.createRoot(document.getElementById('root'));
 
 root.render(
@@ -325,4 +409,5 @@ root.render(
 
 logger.info('Digital Compliance Tool started');
 
+// Export context for external use
 export { ExcelDataContext };

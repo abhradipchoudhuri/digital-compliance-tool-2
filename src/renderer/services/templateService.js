@@ -29,11 +29,11 @@ class TemplateService {
       copyGenerator.initialize(excelData, excelService);
       
       this.isInitialized = true;
-      console.log('✅ TemplateService: Initialization complete');
+      console.log('TemplateService: Initialization complete');
       
       return { success: true };
     } catch (error) {
-      console.error('❌ TemplateService: Initialization error:', error);
+      console.error('TemplateService: Initialization error:', error);
       this.isInitialized = false;
       return { 
         success: false, 

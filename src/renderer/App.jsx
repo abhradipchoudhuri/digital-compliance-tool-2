@@ -5,7 +5,7 @@
 import React, { useState } from 'react';
 import { useExcelData } from './index';
 import templateService from './services/templateService';
-import { ChevronDown, Search, Check, Copy, AlertCircle, Info, Sparkles } from 'lucide-react';
+import { ChevronDown, Search, Check, Copy, AlertCircle, Info } from 'lucide-react';
 
 const App = () => {
   // ============================================
@@ -185,11 +185,11 @@ const App = () => {
       } else {
         const errorMsg = result.error || 'Unknown error occurred';
         setCopyError(errorMsg);
-        console.error('❌ Generation failed:', errorMsg);
+        console.error('Generation failed:', errorMsg);
       }
       
     } catch (error) {
-      console.error('❌ Error in handleGenerate:', error);
+      console.error('Error in handleGenerate:', error);
       setCopyError(error.message);
     } finally {
       setIsGenerating(false);
@@ -269,18 +269,13 @@ const App = () => {
           <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-transparent via-[#a2674f] to-transparent"></div>
           
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <div className="w-14 h-14 bg-gradient-to-br from-[#a2674f] to-[#8b5a42] rounded-xl flex items-center justify-center shadow-lg animate-float">
-                <Sparkles className="w-7 h-7 text-white animate-pulse-soft" />
-              </div>
-              <div>
-                <h1 className="text-3xl font-bold text-slate-900 mb-2 hover-lift">
-                  Legal Copy Generator
-                </h1>
-                <p className="text-slate-600">
-                  Generate legal copy for digital and traditional marketing materials across entire global portfolio
-                </p>
-              </div>
+            <div>
+              <h1 className="text-3xl font-bold text-slate-900 mb-2 hover-lift">
+                Legal Copy Generator
+              </h1>
+              <p className="text-slate-600">
+                Generate legal copy for digital and traditional marketing materials across entire global portfolio
+              </p>
             </div>
             <div className="text-right">
               <div className="text-sm text-slate-500">Data Status</div>
@@ -579,12 +574,12 @@ const App = () => {
           <div className="mt-8 bg-white/80 backdrop-blur-sm border border-gray-200 rounded-lg p-4 shadow-sm animate-fade-in">
             <h4 className="text-sm font-medium text-gray-700 mb-2">Development Status</h4>
             <div className="text-xs text-gray-600 space-y-1">
-              <div>✓ All Brands in DB: {rawBrands.length}</div>
-              <div>✓ Brands for Selected Country: {availableBrands.length}</div>
-              <div>✓ Countries loaded: {countries.length}</div>
-              <div>✓ Asset Types loaded: {assetTypes.length}</div>
-              <div>✓ Template Service: Initialized</div>
-              <div>✓ Copy Generator: Ready</div>
+              <div>All Brands in DB: {rawBrands.length}</div>
+              <div>Brands for Selected Country: {availableBrands.length}</div>
+              <div>Countries loaded: {countries.length}</div>
+              <div>Asset Types loaded: {assetTypes.length}</div>
+              <div>Template Service: Initialized</div>
+              <div>Copy Generator: Ready</div>
               {selectedCountry && (
                 <div className="mt-2 pt-2 border-t border-gray-300">
                   <div className="font-semibold">Selected Country: {selectedCountry}</div>

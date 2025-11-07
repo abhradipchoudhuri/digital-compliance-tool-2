@@ -110,7 +110,7 @@ class ExcelService {
       }))
       .filter(brand => brand.name); // Only include rows with names
     
-    console.log(`getBrands(): Found ${brands.length} brands`);
+    console.log(`getBrands(): Found ${brands.length} brands in Trademark Config`);
     return brands;
   }
 
@@ -221,30 +221,23 @@ class ExcelService {
 
   /**
    * Get brands available in a specific country
-   * USES BRAND AVAILABILITY SHEET as designed
-   * FUZZY MATCHING to handle name variations between sheets
+   * Uses Brand Availability names for display (Column A)
    * @param {string} countryCode - Country code (e.g., 'US', 'CA', 'GB')
    * @returns {Array} Array of brand objects available in that country
    */
   getBrandsForCountry(countryCode) {
+    console.log(`\n========================================`);
+    console.log(`getBrandsForCountry called for: ${countryCode}`);
+    console.log(`========================================`);
+    
     if (!this.data || !this.data['Brand Availability']) {
       console.warn('Brand Availability sheet not found, returning all brands');
       return this.getBrands();
     }
 
-    // Helper function to normalize brand names for matching
-    // Handles variations like "Jack Daniel's Old No. 7" vs "Jack Daniel's Old N.7"
-    const normalizeBrandName = (name) => {
-      if (!name) return '';
-      return name
-        .toLowerCase()
-        .replace(/[^\w\s]/g, '') // Remove punctuation (apostrophes, periods, hyphens)
-        .replace(/\s+/g, ' ')    // Normalize multiple spaces to single space
-        .trim();
-    };
-
-    // Get all brands marked as available in this country from Brand Availability sheet
-    const availableBrandNames = this.data['Brand Availability']
+    // STEP 1: Get brand names from Brand Availability sheet (Column A)
+    // that are available in the specified country (Column B)
+    const availableBrandRows = this.data['Brand Availability']
       .filter(row => {
         const availableCountries = row['Available Countries'] || '';
         
@@ -256,55 +249,119 @@ class ExcelService {
         // Check if country code is in the comma-separated list
         const countryList = availableCountries.split(',').map(c => c.trim());
         return countryList.includes(countryCode);
-      })
-      .map(row => row['Brand Name']);
-
-    console.log(`Brand Availability sheet has ${availableBrandNames.length} brands for ${countryCode}`);
-
-    // Get full brand data from Trademark Config
-    const allBrands = this.getBrands();
-    
-    // Create normalized lookup for matching
-    const normalizedAvailable = availableBrandNames.map(name => ({
-      original: name,
-      normalized: normalizeBrandName(name)
-    }));
-
-    // Match brands using fuzzy comparison to handle naming differences
-    const availableBrands = allBrands.filter(brand => {
-      const brandNormalized = normalizeBrandName(brand.name);
-      const brandNameNormalized = normalizeBrandName(brand.brandNames || '');
-      const displayNormalized = normalizeBrandName(brand.displayNames || '');
-      
-      // Check if this brand matches any available brand (normalized comparison)
-      const matches = normalizedAvailable.some(avail => {
-        // Try various matching strategies
-        return (
-          // Exact normalized match
-          brandNormalized === avail.normalized ||
-          brandNameNormalized === avail.normalized ||
-          displayNormalized === avail.normalized ||
-          // Contains match (for cases like "Jack Daniel's (FOB)" matching "Jack Daniel's Old No. 7")
-          brandNormalized.includes(avail.normalized) || 
-          avail.normalized.includes(brandNormalized) ||
-          brandNameNormalized.includes(avail.normalized) ||
-          avail.normalized.includes(brandNameNormalized) ||
-          displayNormalized.includes(avail.normalized) ||
-          avail.normalized.includes(displayNormalized)
-        );
       });
+
+    console.log(`STEP 1: Found ${availableBrandRows.length} brands in Brand Availability for ${countryCode}`);
+
+    // STEP 2: Get ALL brands from Trademark Config
+    const allBrands = this.getBrands();
+    console.log(`STEP 2: Found ${allBrands.length} total brands in Trademark Config`);
+
+    // STEP 3: Match and preserve Brand Availability names
+    const matchedBrands = [];
+    const unmatchedBrands = [];
+    
+    availableBrandRows.forEach(row => {
+      const availBrandName = row['Brand Name'];
+      const matched = this.findMatchingBrand(availBrandName, allBrands);
       
-      return matches;
+      if (matched) {
+        // Use Brand Availability name for display, but keep other data from Trademark Config
+        matchedBrands.push({
+          ...matched,
+          name: availBrandName,  // Override with Brand Availability name
+          displayNames: availBrandName,  // Override display name
+          originalName: matched.name  // Keep original for reference
+        });
+      } else {
+        unmatchedBrands.push(availBrandName);
+      }
     });
 
-    console.log(`getBrandsForCountry(${countryCode}): Matched ${availableBrands.length} brands from Trademark Config`);
+    console.log(`STEP 3: Successfully matched ${matchedBrands.length} brands with Trademark Config`);
     
-    // Log which brands matched for debugging
-    if (availableBrands.length > 0 && availableBrands.length <= 20) {
-      console.log('Matched brands:', availableBrands.map(b => b.name).join(', '));
+    if (unmatchedBrands.length > 0) {
+      console.warn(`WARNING: ${unmatchedBrands.length} brands from Brand Availability could NOT be matched:`);
+      console.warn('Unmatched brands:', unmatchedBrands.slice(0, 20));
     }
     
-    return availableBrands;
+    console.log(`========================================`);
+    console.log(`FINAL RESULT: Returning ${matchedBrands.length} brands for ${countryCode}`);
+    console.log(`========================================\n`);
+    
+    return matchedBrands;
+  }
+
+  /**
+   * Find matching brand using multiple strategies
+   * @param {string} searchName - Brand name from Brand Availability
+   * @param {Array} allBrands - All brands from Trademark Config
+   * @returns {Object|null} Matched brand object or null
+   */
+  findMatchingBrand(searchName, allBrands) {
+    if (!searchName) return null;
+
+    // Normalize function - removes special characters and spaces
+    const normalize = (str) => {
+      if (!str) return '';
+      return str
+        .toLowerCase()
+        .replace(/[^\w\s]/g, '') // Remove punctuation
+        .replace(/\s+/g, ''); // Remove spaces
+    };
+
+    const normalizedSearch = normalize(searchName);
+
+    // Strategy 1: Exact match on Display Names
+    let match = allBrands.find(b => b.displayNames === searchName);
+    if (match) {
+      console.log(`  ✓ Exact match (Display): "${searchName}" -> "${match.displayNames}"`);
+      return match;
+    }
+
+    // Strategy 2: Exact match on Brand Names
+    match = allBrands.find(b => b.brandNames === searchName);
+    if (match) {
+      console.log(`  ✓ Exact match (Brand): "${searchName}" -> "${match.brandNames}"`);
+      return match;
+    }
+
+    // Strategy 3: Normalized match on Display Names
+    match = allBrands.find(b => normalize(b.displayNames) === normalizedSearch);
+    if (match) {
+      console.log(`  ✓ Normalized match (Display): "${searchName}" -> "${match.displayNames}"`);
+      return match;
+    }
+
+    // Strategy 4: Normalized match on Brand Names
+    match = allBrands.find(b => normalize(b.brandNames) === normalizedSearch);
+    if (match) {
+      console.log(`  ✓ Normalized match (Brand): "${searchName}" -> "${match.brandNames}"`);
+      return match;
+    }
+
+    // Strategy 5: Contains match - search name contains brand name or vice versa
+    match = allBrands.find(b => {
+      const displayNorm = normalize(b.displayNames);
+      const brandNorm = normalize(b.brandNames);
+      const nameNorm = normalize(b.name);
+      
+      return normalizedSearch.includes(displayNorm) || 
+             displayNorm.includes(normalizedSearch) ||
+             normalizedSearch.includes(brandNorm) || 
+             brandNorm.includes(normalizedSearch) ||
+             normalizedSearch.includes(nameNorm) || 
+             nameNorm.includes(normalizedSearch);
+    });
+    
+    if (match) {
+      console.log(`  ✓ Contains match: "${searchName}" -> "${match.displayNames || match.name}"`);
+      return match;
+    }
+
+    // No match found
+    console.log(`  ✗ No match found for: "${searchName}"`);
+    return null;
   }
 
   /**

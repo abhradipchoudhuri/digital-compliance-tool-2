@@ -138,7 +138,7 @@ class CopyGenerator {
 
     this.validateData();
     
-    console.log('✓ CopyGenerator: Initialization complete');
+    console.log('CopyGenerator: Initialization complete');
   }
 
   /**
@@ -177,7 +177,7 @@ class CopyGenerator {
    * @param {Object} params - Generation parameters
    * @param {string} params.assetType - Asset type name
    * @param {string} params.countryCode - Country code (e.g., 'US', 'GB')
-   * @param {Array<string>} params.brandIds - Array of brand names/IDs
+   * @param {Array<string>} params.brandIds - Array of brand names/IDs (can include expressions)
    * @returns {Object} Generation result with success status, copy, and metadata
    */
   generateCopy(params) {
@@ -209,7 +209,7 @@ class CopyGenerator {
         throw new Error(`No language variables found for: ${language}`);
       }
 
-      // Get brand data
+      // Get brand data - handles expressions
       const brandDataList = this.getBrandData(brandIds);
       if (brandDataList.length === 0) {
         throw new Error(`No brand data found for brands: ${brandIds.join(', ')}`);
@@ -217,6 +217,8 @@ class CopyGenerator {
 
       console.log('Brands found:', brandDataList.map(b => ({
         name: b['Brand Names'] || b['Display Names'],
+        expression: b.expressionName,
+        isExpression: b.isExpression,
         ttbType: b['TTB Type']
       })));
 
@@ -232,7 +234,7 @@ class CopyGenerator {
 
       const generationTime = Date.now() - startTime;
 
-      console.log('✓ Copy generation complete!');
+      console.log('Copy generation complete!');
 
       return {
         success: true,
@@ -242,7 +244,7 @@ class CopyGenerator {
           countryCode,
           language,
           brandCount: brandIds.length,
-          brands: brandDataList.map(b => b['Brand Names'] || b['Display Names']),
+          brands: brandDataList.map(b => b.expressionName || b['Brand Names'] || b['Display Names']),
           templateUsed: template['Asset Type'],
           generationTime: `${generationTime}ms`,
           timestamp: new Date().toISOString()
@@ -250,7 +252,7 @@ class CopyGenerator {
       };
 
     } catch (error) {
-      console.error('❌ Copy generation error:', error);
+      console.error('Copy generation error:', error);
       return {
         success: false,
         error: error.message,
@@ -316,7 +318,7 @@ class CopyGenerator {
       return countryData['Language'];
     }
 
-    console.warn(`⚠️ No language found for country ${countryCode}, defaulting to English (Default)`);
+    console.warn(`No language found for country ${countryCode}, defaulting to English (Default)`);
     return 'English (Default)';
   }
 
@@ -333,22 +335,45 @@ class CopyGenerator {
 
   /**
    * Get brand data for multiple brand IDs
-   * @param {Array<string>} brandIds - Array of brand names/IDs
+   * Handles both base brands and expressions
+   * @param {Array<string>} brandIds - Array of brand names/IDs (can be expressions)
    * @returns {Array<Object>} Array of brand data objects
    */
   getBrandData(brandIds) {
     const brandDataList = [];
 
     for (const brandId of brandIds) {
-      const brandData = this.trademarkData.find(b => 
+      // First try exact match
+      let brandData = this.trademarkData.find(b => 
         b['Brand Names'] === brandId || 
         b['Display Names'] === brandId
       );
 
+      // If not found, extract base brand and try again
+      if (!brandData) {
+        const baseBrand = this.excelService.extractBaseBrand(brandId);
+        console.log(`Expression detected: "${brandId}" -> Base: "${baseBrand}"`);
+        
+        brandData = this.trademarkData.find(b => 
+          b['Brand Names'] === baseBrand || 
+          b['Display Names'] === baseBrand
+        );
+        
+        if (brandData) {
+          // Store both expression and base brand info
+          brandData = {
+            ...brandData,
+            expressionName: brandId,  // Keep the full expression name for TTB lookups
+            isExpression: true
+          };
+          console.log(`Found base brand in Trademark Config for expression "${brandId}"`);
+        }
+      }
+
       if (brandData) {
         brandDataList.push(brandData);
       } else {
-        console.warn(`⚠️ Brand not found: ${brandId}`);
+        console.warn(`Brand not found in Trademark Config: ${brandId}`);
       }
     }
 
@@ -360,9 +385,10 @@ class CopyGenerator {
   // ============================================
 
   /**
-   * Get the full TTB row for a brand
+   * Get the full TTB row for a brand or expression
    * Uses fuzzy matching to handle brand name variations
-   * @param {string} brandName - Brand name to look up
+   * For expressions, uses the FULL expression name
+   * @param {string} brandName - Brand name or expression to look up
    * @param {string} displayName - Display name to try as fallback
    * @returns {Object|null} TTB row object or null
    */
@@ -421,9 +447,10 @@ class CopyGenerator {
   }
 
   /**
-   * Get TTB statement for a brand
+   * Get TTB statement for a brand or expression
+   * For expressions, uses the FULL expression name to get specific ABV
    * Uses enhanced fuzzy matching to handle name variations
-   * @param {string} brandName - Brand name
+   * @param {string} brandName - Brand name or expression
    * @param {string} ttbType - TTB type (Full/Tightened/Limited Character)
    * @param {string} displayName - Display name as fallback
    * @returns {string} TTB statement text
@@ -435,7 +462,7 @@ class CopyGenerator {
     }
     
     if (!this.ttbStatements || this.ttbStatements.length === 0) {
-      console.warn('⚠️ TTB Statements sheet is empty or not loaded');
+      console.warn('TTB Statements sheet is empty or not loaded');
       return '';
     }
 
@@ -546,23 +573,23 @@ class CopyGenerator {
       console.log(`No match with Brand Names, trying Display Names: "${displayName}"`);
       result = tryMatch(displayName);
       if (result) {
-        console.log(`✓ Found match using Display Names!`);
+        console.log(`Found match using Display Names!`);
       }
     }
 
     if (!result) {
-      console.warn(`⚠️ No TTB statement found for brand: "${brandName}"`);
+      console.warn(`No TTB statement found for brand: "${brandName}"`);
       if (displayName && displayName !== brandName) {
-        console.warn(`⚠️ Also tried Display Names: "${displayName}"`);
+        console.warn(`Also tried Display Names: "${displayName}"`);
       }
-      console.warn(`⚠️ Available brands: ${availableTTBBrands.slice(0, 5).join(', ')}...`);
+      console.warn(`Available brands: ${availableTTBBrands.slice(0, 5).join(', ')}...`);
       return '';
     }
 
     const ttbRow = result.row;
     const matchStrategy = result.strategy;
     
-    console.log(`✓ Found TTB row for: "${ttbRow['Brand Name'] || ttbRow['Brand']}" [${matchStrategy}]`);
+    console.log(`Found TTB row for: "${ttbRow['Brand Name'] || ttbRow['Brand']}" [${matchStrategy}]`);
 
     // Get the appropriate TTB statement based on type
     let statement = '';
@@ -588,14 +615,14 @@ class CopyGenerator {
     }
 
     if (!statement) {
-      console.warn(`⚠️ No statement found for type "${ttbType}", trying default...`);
+      console.warn(`No statement found for type "${ttbType}", trying default...`);
       statement = ttbRow['TTB Statement'] || ttbRow['Statement'] || '';
     }
 
     if (statement) {
-      console.log(`✓ TTB Statement found for ${brandName} (${ttbType}): ${statement.substring(0, 100)}...`);
+      console.log(`TTB Statement found for ${brandName} (${ttbType}): ${statement.substring(0, 100)}...`);
     } else {
-      console.warn(`⚠️ No TTB statement text found for ${brandName} (${ttbType})`);
+      console.warn(`No TTB statement text found for ${brandName} (${ttbType})`);
     }
 
     return statement;
@@ -643,6 +670,7 @@ class CopyGenerator {
   /**
    * Build TTB section based on brand selection rules
    * Handles 4 scenarios: single brand, same class, different classes, portfolio
+   * For expressions, uses FULL expression name to get specific ABV
    * @param {Array<Object>} brandDataList - Array of brand data objects
    * @param {string} ttbType - TTB type (Full/Tightened/Limited Character)
    * @returns {string} Formatted TTB section
@@ -658,7 +686,8 @@ class CopyGenerator {
     if (brandDataList.length === 1) {
       console.log('Scenario 1: Single brand - Full TTB');
       const brandData = brandDataList[0];
-      const brandName = brandData['Brand Names'] || brandData['Display Names'];
+      // Use expression name if it exists, otherwise use brand name
+      const brandName = brandData.expressionName || brandData['Brand Names'] || brandData['Display Names'];
       const displayName = brandData['Display Names'];
       return this.getTTBStatement(brandName, ttbType, displayName);
     }
@@ -668,7 +697,7 @@ class CopyGenerator {
     console.log(`Unique entities: ${entities.join(', ')}`);
     
     // Get the first brand's TTB data to check for multi-brand columns
-    const firstBrandName = brandDataList[0]['Brand Names'] || brandDataList[0]['Display Names'];
+    const firstBrandName = brandDataList[0].expressionName || brandDataList[0]['Brand Names'] || brandDataList[0]['Display Names'];
     const firstBrandDisplayName = brandDataList[0]['Display Names'];
     const firstBrandTTBRow = this.getTTBRow(firstBrandName, firstBrandDisplayName);
     
@@ -693,7 +722,7 @@ class CopyGenerator {
       
       // Check if all brands have the same class type
       const ttbData = brandDataList.map(brandData => {
-        const brandName = brandData['Brand Names'] || brandData['Display Names'];
+        const brandName = brandData.expressionName || brandData['Brand Names'] || brandData['Display Names'];
         const displayName = brandData['Display Names'];
         const statement = this.getTTBStatement(brandName, ttbType, displayName);
         const parsed = this.parseTTBStatement(statement);
@@ -768,7 +797,7 @@ class CopyGenerator {
   detectPortfolio(brandDataList) {
     if (brandDataList.length < 2) return null;
     
-    const brandNames = brandDataList.map(b => b['Brand Names'] || b['Display Names']);
+    const brandNames = brandDataList.map(b => b.expressionName || b['Brand Names'] || b['Display Names']);
     
     // Check for common portfolio prefixes
     const portfolios = [
@@ -796,12 +825,13 @@ class CopyGenerator {
 
   /**
    * Get US-specific Responsibility Message for a brand
-   * @param {string} brandName - Brand name
+   * For expressions, tries expression first then falls back to base brand
+   * @param {string} brandName - Brand name or expression
    * @returns {string} US RMD text or empty string
    */
   getUSResponsibilityMessage(brandName) {
     if (!this.usResponsibilityMessage || this.usResponsibilityMessage.length === 0) {
-      console.warn('⚠️ US Responsibility Message sheet is empty or not loaded');
+      console.warn('US Responsibility Message sheet is empty or not loaded');
       return '';
     }
     
@@ -830,7 +860,7 @@ class CopyGenerator {
     });
     
     if (usRMDRow) {
-      console.log(`✓ Found US RMD (exact match): ${usRMDRow['US RMD']}`);
+      console.log(`Found US RMD (exact match): ${usRMDRow['US RMD']}`);
       return usRMDRow['US RMD'] || '';
     }
     
@@ -847,7 +877,7 @@ class CopyGenerator {
     });
     
     if (usRMDRow) {
-      console.log(`✓ Found US RMD (normalized match): ${usRMDRow['US RMD']}`);
+      console.log(`Found US RMD (normalized match): ${usRMDRow['US RMD']}`);
       return usRMDRow['US RMD'] || '';
     }
     
@@ -868,13 +898,20 @@ class CopyGenerator {
     });
     
     if (usRMDRow) {
-      console.log(`✓ Found US RMD (fuzzy match): ${usRMDRow['US RMD']}`);
+      console.log(`Found US RMD (fuzzy match): ${usRMDRow['US RMD']}`);
       return usRMDRow['US RMD'] || '';
     }
     
-    console.warn(`⚠️ No US Responsibility Message found for brand: "${brandName}"`);
-    console.warn(`⚠️ Normalized: "${normalizedSearch}"`);
-    console.warn(`⚠️ First 5 available: ${this.usResponsibilityMessage.slice(0, 5).map(r => `"${r['Brand Name']}" (norm: "${normalize(r['Brand Name'])}")`).join(', ')}`);
+    // If this is an expression, try with the base brand
+    const baseBrand = this.excelService.extractBaseBrand(brandName);
+    if (baseBrand !== brandName) {
+      console.log(`Trying with base brand: "${baseBrand}"`);
+      return this.getUSResponsibilityMessage(baseBrand);
+    }
+    
+    console.warn(`No US Responsibility Message found for brand: "${brandName}"`);
+    console.warn(`Normalized: "${normalizedSearch}"`);
+    console.warn(`First 5 available: ${this.usResponsibilityMessage.slice(0, 5).map(r => `"${r['Brand Name']}" (norm: "${normalize(r['Brand Name'])}")`).join(', ')}`);
     return '';
   }
 
@@ -885,6 +922,7 @@ class CopyGenerator {
   /**
    * Build trademark section for selected brands
    * Handles singular/plural formatting, portfolio prefixes, and entity copyrights
+   * For expressions, uses BASE brand name (not the expression)
    * @param {Array<Object>} brandDataList - Array of brand data
    * @param {string} language - Language name
    * @param {string} assetType - Asset type name
@@ -900,7 +938,7 @@ class CopyGenerator {
     
     console.log(`Building trademark section for ${brandDataList.length} brand(s), Language: ${language}, Asset Type: ${assetType}`);
     
-    // CRITICAL FIX: Use NUMBER 1 instead of STRING '1' for single brand
+    // CRITICAL: Use NUMBER 1 instead of STRING '1' for single brand
     // Excel has Singular vs Plural = 1 (number) for single brand, not '1' (string)
     const singularOrPlural = brandDataList.length === 1 ? 1 : '1+';
     
@@ -910,7 +948,7 @@ class CopyGenerator {
     );
     
     if (!tmLangData) {
-      console.warn(`⚠️ No trademark language found for: ${language} (${singularOrPlural})`);
+      console.warn(`No trademark language found for: ${language} (${singularOrPlural})`);
       return '';
     }
     
@@ -945,7 +983,7 @@ class CopyGenerator {
       : tmLangData;
     
     if (!effectiveTmLangData) {
-      console.warn(`⚠️ No trademark language found for: ${language} (${effectiveSingularOrPlural})`);
+      console.warn(`No trademark language found for: ${language} (${effectiveSingularOrPlural})`);
       return '';
     }
     
@@ -960,7 +998,7 @@ class CopyGenerator {
     );
     
     if (!tmStructure) {
-      console.warn(`⚠️ No trademark structure found for type: ${trademarkType}`);
+      console.warn(`No trademark structure found for type: ${trademarkType}`);
       return '';
     }
     
@@ -971,7 +1009,7 @@ class CopyGenerator {
     let trademarkText = '';
     
     if (brandDataList.length === 1) {
-      // SINGULAR brand trademark
+      // SINGULAR brand trademark - use BASE brand name
       const brandData = brandDataList[0];
       let brandName = brandData['Brand Names'] || brandData['Display Names'];
       const entityName = brandData['Entity Names'] || '';
@@ -1017,7 +1055,7 @@ class CopyGenerator {
       console.log(`Singular trademark: ${trademarkText}`);
       
     } else {
-      // PLURAL brands trademark
+      // PLURAL brands trademark - use BASE brand names
       
       // Check if all brands have the same entity
       const entities = [...new Set(brandDataList.map(b => b['Entity Names']).filter(Boolean))];
@@ -1026,7 +1064,7 @@ class CopyGenerator {
       
       console.log(`Same entity check: ${sameEntity}, Entity: ${portfolioEntity}`);
       
-      // Get all brand names
+      // Get all brand names - use BASE brand names
       let brandNames = brandDataList.map(b => b['Brand Names'] || b['Display Names']);
       
       // If all brands are from the same portfolio entity, prepend the entity name
@@ -1128,7 +1166,7 @@ class CopyGenerator {
     if (ttbTypeForAsset) {
       console.log(`TTB Type for "${assetType}": ${ttbTypeForAsset}`);
     } else {
-      console.warn(`⚠️ No TTB Type mapping found for "${assetType}", defaulting to "Full"`);
+      console.warn(`No TTB Type mapping found for "${assetType}", defaulting to "Full"`);
     }
     const ttbType = ttbTypeForAsset || 'Full';
 
@@ -1139,7 +1177,7 @@ class CopyGenerator {
       // For US brands, use brand-specific US RMD instead of generic responsibility language
       if (countryCode === 'US' && this.usResponsibilityMessage && this.usResponsibilityMessage.length > 0) {
         if (brandDataList.length === 1) {
-          const brandName = brandDataList[0]['Brand Names'] || brandDataList[0]['Display Names'];
+          const brandName = brandDataList[0].expressionName || brandDataList[0]['Brand Names'] || brandDataList[0]['Display Names'];
           const usRMD = this.getUSResponsibilityMessage(brandName);
           if (usRMD) {
             respLang = usRMD;
@@ -1161,7 +1199,7 @@ class CopyGenerator {
       }
       
       copyText = copyText.replace(/<<Responsibility Language>>/g, respLang);
-      console.log('✓ Replaced: Responsibility Language');
+      console.log('Replaced: Responsibility Language');
     }
 
     // Replace TTB statement
@@ -1177,11 +1215,11 @@ class CopyGenerator {
         if (ttbSection) {
           const formattedTTB = '<br><br>' + ttbSection + '<br><br>';
           copyText = copyText.replace(/<<TTB>>/g, formattedTTB);
-          console.log(`✓ Replaced <<TTB>>`);
+          console.log(`Replaced <<TTB>>`);
           console.log('TTB Section:', ttbSection);
         } else {
           copyText = copyText.replace(/<<TTB>>/g, '');
-          console.warn('⚠️ No TTB section generated - placeholder removed');
+          console.warn('No TTB section generated - placeholder removed');
         }
       } else {
         copyText = copyText.replace(/<<TTB>>/g, '');
@@ -1195,28 +1233,28 @@ class CopyGenerator {
     if (copyText.includes('<<Trademark>>')) {
       const trademarkSection = this.buildTrademarkSection(brandDataList, language, assetType, countryCode);
       copyText = copyText.replace(/<<Trademark>>/g, trademarkSection);
-      console.log('✓ Replaced: Trademark');
+      console.log('Replaced: Trademark');
     }
 
     // Replace Forward Notice
     if (copyText.includes('<<Forward Notice>>')) {
       const forwardNotice = this.getForwardNotice(brandDataList, langVars);
       copyText = copyText.replace(/<<Forward Notice>>/g, forwardNotice);
-      console.log('✓ Replaced: Forward Notice');
+      console.log('Replaced: Forward Notice');
     }
 
     // Replace All Other Trademarks
     if (copyText.includes('<<All Other Trademarks>>')) {
       const allOtherTM = this.safeGetValue(langVars['All Other Trademarks'], 'All Other Trademarks');
       copyText = copyText.replace(/<<All Other Trademarks>>/g, allOtherTM);
-      console.log('✓ Replaced: All Other Trademarks');
+      console.log('Replaced: All Other Trademarks');
     }
 
     // Replace Responsibility Site
     if (copyText.includes('<<Responsibility Site>>')) {
       const respSite = this.safeGetValue(langVars['Responsibility Site'], 'Responsibility Site');
       copyText = copyText.replace(/<<Responsibility Site>>/g, respSite);
-      console.log('✓ Replaced: Responsibility Site');
+      console.log('Replaced: Responsibility Site');
     }
 
     // Replace Legal Documents (with pre-built hyperlinks from Excel)
@@ -1228,7 +1266,7 @@ class CopyGenerator {
       
       if (prebuiltHyperlinks) {
         copyText = copyText.replace(/<<Legal Documents>>/g, prebuiltHyperlinks);
-        console.log('✓ Replaced: Legal Documents (using pre-built hyperlinks from Excel)');
+        console.log('Replaced: Legal Documents (using pre-built hyperlinks from Excel)');
       } else {
         console.log('"Website Legal Documents (Hyperlinks)" column not found, using fallback');
         
@@ -1254,7 +1292,7 @@ class CopyGenerator {
         
         const hyperlinkDocs = hyperlinkSegments.join(' | ');
         copyText = copyText.replace(/<<Legal Documents>>/g, hyperlinkDocs);
-        console.log('✓ Replaced: Legal Documents (using fallback position-based hyperlinks)');
+        console.log('Replaced: Legal Documents (using fallback position-based hyperlinks)');
       }
     }
 
@@ -1262,7 +1300,7 @@ class CopyGenerator {
     if (copyText.includes('<<Email Sent By>>')) {
       const emailSentBy = this.safeGetValue(langVars['Email Sent By Statement'], 'Email Sent By Statement');
       copyText = copyText.replace(/<<Email Sent By>>/g, emailSentBy);
-      console.log('✓ Replaced: Email Sent By');
+      console.log('Replaced: Email Sent By');
     }
 
     // Replace Email Legal Documents
@@ -1290,28 +1328,28 @@ class CopyGenerator {
       const hyperlinkDocs = hyperlinkSegments.join(' | ');
       
       copyText = copyText.replace(/<<Email Legal Documents>>/g, hyperlinkDocs);
-      console.log('✓ Replaced: Email Legal Documents (with position-based hyperlinks)');
+      console.log('Replaced: Email Legal Documents (with position-based hyperlinks)');
     }
 
     // Replace Email Header
     if (copyText.includes('<<Email Header>>')) {
       const emailHeader = this.safeGetValue(langVars['Email Header'], 'Email Header');
       copyText = copyText.replace(/<<Email Header>>/g, emailHeader);
-      console.log('✓ Replaced: Email Header');
+      console.log('Replaced: Email Header');
     }
 
     // Replace UGC Policy
     if (copyText.includes('<<UGC Policy>>')) {
       const ugcPolicy = this.safeGetValue(langVars['UGC Policy'], 'UGC Policy');
       copyText = copyText.replace(/<<UGC Policy>>/g, ugcPolicy);
-      console.log('✓ Replaced: UGC Policy:', ugcPolicy);
+      console.log('Replaced: UGC Policy:', ugcPolicy);
     }
 
     // Replace Age-Gate Statement
     if (copyText.includes('<<Age-Gate Statement>>')) {
       const ageGate = this.safeGetValue(langVars['Age-Gate Statement'], 'Age-Gate Statement');
       copyText = copyText.replace(/<<Age-Gate Statement>>/g, ageGate);
-      console.log('✓ Replaced: Age-Gate Statement');
+      console.log('Replaced: Age-Gate Statement');
     }
 
     // Replace Terms of Use (with hyperlink)
@@ -1319,7 +1357,7 @@ class CopyGenerator {
       const termsOfUseUrl = this.safeGetValue(langVars['Terms of Use'], 'Terms of Use');
       const termsOfUseLink = termsOfUseUrl ? `<a href="${termsOfUseUrl}" target="_blank" rel="noopener noreferrer">Terms of Use</a>` : 'Terms of Use';
       copyText = copyText.replace(/<<Terms of Use>>/g, termsOfUseLink);
-      console.log('✓ Replaced: Terms of Use (with hyperlink)');
+      console.log('Replaced: Terms of Use (with hyperlink)');
     }
 
     // Replace Privacy Policy (with hyperlink)
@@ -1327,7 +1365,7 @@ class CopyGenerator {
       const privacyPolicyUrl = this.safeGetValue(langVars['Privacy Policy'], 'Privacy Policy');
       const privacyPolicyLink = privacyPolicyUrl ? `<a href="${privacyPolicyUrl}" target="_blank" rel="noopener noreferrer">Privacy Policy</a>` : 'Privacy Policy';
       copyText = copyText.replace(/<<Privacy Policy>>/g, privacyPolicyLink);
-      console.log('✓ Replaced: Privacy Policy (with hyperlink)');
+      console.log('Replaced: Privacy Policy (with hyperlink)');
     }
 
     // Replace Cookie Policy (with hyperlink)
@@ -1335,28 +1373,28 @@ class CopyGenerator {
       const cookiePolicyUrl = this.safeGetValue(langVars['Cookie Policy'], 'Cookie Policy');
       const cookiePolicyLink = cookiePolicyUrl ? `<a href="${cookiePolicyUrl}" target="_blank" rel="noopener noreferrer">Cookie Policy</a>` : 'Cookie Policy';
       copyText = copyText.replace(/<<Cookie Policy>>/g, cookiePolicyLink);
-      console.log('✓ Replaced: Cookie Policy (with hyperlink)');
+      console.log('Replaced: Cookie Policy (with hyperlink)');
     }
 
     // Replace Terms Agreement
     if (copyText.includes('<<Terms Agreement>>')) {
       const termsAgreement = this.safeGetValue(langVars['Terms Agreement'], 'Terms Agreement');
       copyText = copyText.replace(/<<Terms Agreement>>/g, termsAgreement);
-      console.log('✓ Replaced: Terms Agreement');
+      console.log('Replaced: Terms Agreement');
     }
 
     // Replace Email Opt-In Statement
     if (copyText.includes('<<Email Opt-In Statement>>')) {
       const optIn = this.safeGetValue(langVars['Email Opt-In Statement and Consent Statement'], 'Email Opt-In Statement');
       copyText = copyText.replace(/<<Email Opt-In Statement>>/g, optIn);
-      console.log('✓ Replaced: Email Opt-In Statement');
+      console.log('Replaced: Email Opt-In Statement');
     }
 
     // Replace Abbreviated Privacy Policy
     if (copyText.includes('<<Abbreviated Privacy Policy>>')) {
       const abbrevPrivacy = this.safeGetValue(langVars['Abbreviated Privacy Policy'], 'Abbreviated Privacy Policy');
       copyText = copyText.replace(/<<Abbreviated Privacy Policy>>/g, abbrevPrivacy);
-      console.log('✓ Replaced: Abbreviated Privacy Policy');
+      console.log('Replaced: Abbreviated Privacy Policy');
     }
 
     // CRITICAL: Replace <<Brand>> at the VERY END
@@ -1365,16 +1403,18 @@ class CopyGenerator {
       let brandNames = '';
       
       if (brandDataList.length === 1) {
-        brandNames = brandDataList[0]['Display Names'] || brandDataList[0]['Brand Names'];
+        // For single brand, use the DISPLAY name (expression name if it exists)
+        brandNames = brandDataList[0].expressionName || brandDataList[0]['Display Names'] || brandDataList[0]['Brand Names'];
       } else if (brandDataList.length === 2) {
-        brandNames = `${brandDataList[0]['Display Names'] || brandDataList[0]['Brand Names']} and ${brandDataList[1]['Display Names'] || brandDataList[1]['Brand Names']}`;
+        const names = brandDataList.map(b => b.expressionName || b['Display Names'] || b['Brand Names']);
+        brandNames = `${names[0]} and ${names[1]}`;
       } else {
-        const names = brandDataList.map(b => b['Display Names'] || b['Brand Names']);
+        const names = brandDataList.map(b => b.expressionName || b['Display Names'] || b['Brand Names']);
         brandNames = names.slice(0, -1).join(', ') + ' and ' + names[names.length - 1];
       }
       
       copyText = copyText.replace(/<<Brand>>/g, brandNames);
-      console.log(`✓ Replaced: Brand → ${brandNames}`);
+      console.log(`Replaced: Brand -> ${brandNames}`);
     }
 
     console.log('Final copy length:', copyText.length);
@@ -1441,7 +1481,7 @@ class CopyGenerator {
     
     // If it's an object (this causes [object Object])
     if (typeof value === 'object') {
-      console.warn(`⚠️ Field "${fieldName}" returned an object, attempting to extract value...`);
+      console.warn(`Field "${fieldName}" returned an object, attempting to extract value...`);
       
       // Try common object structures
       if (value.text) return String(value.text);
@@ -1453,7 +1493,7 @@ class CopyGenerator {
         return value.join(' ');
       }
       
-      console.error(`❌ Cannot extract string from object for "${fieldName}":`, value);
+      console.error(`Cannot extract string from object for "${fieldName}":`, value);
       return '';
     }
     

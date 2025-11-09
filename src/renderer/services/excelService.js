@@ -15,19 +15,16 @@ class ExcelService {
     try {
       console.log('ExcelService: Starting Excel data load...');
       
-      // Check if we're in Electron environment
       if (!window.electronAPI) {
         throw new Error('Electron API not available');
       }
 
-      // Call main process to load Excel
       const result = await window.electronAPI.loadExcelData();
 
       if (!result.success) {
         throw new Error(result.error || 'Failed to load Excel data');
       }
 
-      // Store the parsed data
       this.data = result.data;
       this.metadata = {
         filePath: result.filePath,
@@ -39,7 +36,7 @@ class ExcelService {
 
       console.log('ExcelService: Excel data loaded successfully!');
       console.log('Available sheets:', Object.keys(this.data));
-      console.log('FIRST BRAND ROW:', this.data['Trademark Config'][1]); // Row 1 (row 0 is headers)
+      console.log('FIRST BRAND ROW:', this.data['Trademark Config'][1]);
       console.log('Sheet summary:');
       Object.keys(this.data).forEach(sheetName => {
         const rowCount = this.data[sheetName].length;
@@ -85,6 +82,53 @@ class ExcelService {
   }
 
   // ============================================
+  // BASE BRAND EXTRACTION LOGIC
+  // ============================================
+
+  /**
+   * Extract base brand name from expression
+   * Handles cases like "Benriach 10 Year Old" -> "Benriach"
+   * @param {string} expressionName - Full expression name
+   * @returns {string} Base brand name
+   */
+  extractBaseBrand(expressionName) {
+    if (!expressionName) return expressionName;
+
+    const patterns = [
+      /^(.+?)\s+\d+\s+Year\s+Old$/i,
+      /^(.+?)\s+\d+\s*YO$/i,
+      /^(.+?)\s+Single\s+Barrel$/i,
+      /^(.+?)\s+Bottled\s+in\s+Bond$/i,
+      /^(.+?)\s+Triple\s+Mash$/i,
+      /^(.+?)\s+Bonded\s+Series$/i,
+      /^(.+?)\s+Select$/i,
+      /^(.+?)\s+Reserve$/i,
+      /^(.+?)\s+Rye$/i,
+      /^(.+?)\s+Honey$/i,
+      /^(.+?)\s+Fire$/i,
+      /^(.+?)\s+Apple$/i,
+      /^(.+?)\s+Tennessee\s+\w+$/i,
+      /^(.+?)\s+&\s+\w+.*$/i,
+      /^(.+?)\s+\(RTD\)$/i,
+      /^(.+?)\s+\(FOB\)$/i,
+      /^(.+?)\s+Blackberry$/i,
+      /^(.+?)\s+Cherry$/i,
+    ];
+
+    for (const pattern of patterns) {
+      const match = expressionName.match(pattern);
+      if (match) {
+        const baseBrand = match[1].trim();
+        console.log(`Extracted base brand: "${expressionName}" -> "${baseBrand}"`);
+        return baseBrand;
+      }
+    }
+
+    console.log(`No pattern match for: "${expressionName}" - using as-is`);
+    return expressionName;
+  }
+
+  // ============================================
   // DATA RETRIEVAL METHODS
   // ============================================
 
@@ -108,7 +152,7 @@ class ExcelService {
         trademarkType: row['Trademark Type'] || '',
         ttbType: row['TTB Type'] || 'Full'
       }))
-      .filter(brand => brand.name); // Only include rows with names
+      .filter(brand => brand.name);
     
     console.log(`getBrands(): Found ${brands.length} brands in Trademark Config`);
     return brands;
@@ -124,7 +168,6 @@ class ExcelService {
       return [];
     }
     
-    // Get from Overall Structure sheet
     const assetTypes = this.data['Overall Structure']
       .map(row => ({
         id: (row['Asset Type'] || '').toString().toLowerCase().replace(/[^a-z0-9]/g, '-'),
@@ -161,10 +204,8 @@ class ExcelService {
           language: language
         });
       } else if (code && uniqueCountries.has(code)) {
-        // Handle multi-language countries (like Belgium-French)
         const existingName = uniqueCountries.get(code).name;
         if (name && name !== existingName) {
-          // Create a variant entry
           const variantCode = `${code}-${language.split(' ')[0].substring(0, 2).toUpperCase()}`;
           uniqueCountries.set(variantCode, {
             code: variantCode,
@@ -202,7 +243,6 @@ class ExcelService {
       return '';
     }
 
-    // Get the appropriate TTB statement based on type
     let statement = '';
     if (ttbType === 'Full') {
       statement = ttbRow['TTB Statement - Full'] || '';
@@ -211,7 +251,6 @@ class ExcelService {
     } else if (ttbType === 'Limited Character') {
       statement = ttbRow['TTB Statement - Limited Character'] || '';
     } else {
-      // Default to Full if type not recognized
       statement = ttbRow['TTB Statement - Full'] || '';
     }
 
@@ -222,6 +261,7 @@ class ExcelService {
   /**
    * Get brands available in a specific country
    * Uses Brand Availability names for display (Column A)
+   * Shows ALL brands from Brand Availability, matches with Trademark Config when possible
    * @param {string} countryCode - Country code (e.g., 'US', 'CA', 'GB')
    * @returns {Array} Array of brand objects available in that country
    */
@@ -235,112 +275,107 @@ class ExcelService {
       return this.getBrands();
     }
 
-    // STEP 1: Get brand names from Brand Availability sheet (Column A)
-    // that are available in the specified country (Column B)
     const availableBrandRows = this.data['Brand Availability']
       .filter(row => {
         const availableCountries = row['Available Countries'] || '';
         
-        // If marked as "ALL", brand is available everywhere
         if (availableCountries === 'ALL') {
           return true;
         }
         
-        // Check if country code is in the comma-separated list
         const countryList = availableCountries.split(',').map(c => c.trim());
         return countryList.includes(countryCode);
       });
 
     console.log(`STEP 1: Found ${availableBrandRows.length} brands in Brand Availability for ${countryCode}`);
 
-    // STEP 2: Get ALL brands from Trademark Config
     const allBrands = this.getBrands();
     console.log(`STEP 2: Found ${allBrands.length} total brands in Trademark Config`);
 
-    // STEP 3: Match and preserve Brand Availability names
-    const matchedBrands = [];
-    const unmatchedBrands = [];
+    const processedBrands = [];
     
     availableBrandRows.forEach(row => {
       const availBrandName = row['Brand Name'];
-      const matched = this.findMatchingBrand(availBrandName, allBrands);
+      
+      const baseBrand = this.extractBaseBrand(availBrandName);
+      const matched = this.findMatchingBrand(baseBrand, allBrands);
       
       if (matched) {
-        // Use Brand Availability name for display, but keep other data from Trademark Config
-        matchedBrands.push({
+        processedBrands.push({
           ...matched,
-          name: availBrandName,  // Override with Brand Availability name
-          displayNames: availBrandName,  // Override display name
-          originalName: matched.name  // Keep original for reference
+          name: availBrandName,
+          displayNames: availBrandName,
+          baseBrand: baseBrand,
+          isExpression: availBrandName !== baseBrand
         });
+        console.log(`  Matched: "${availBrandName}"`);
       } else {
-        unmatchedBrands.push(availBrandName);
+        processedBrands.push({
+          id: availBrandName.toLowerCase().replace(/[^a-z0-9]/g, '-'),
+          name: availBrandName,
+          displayNames: availBrandName,
+          brandNames: availBrandName,
+          entity: '',
+          trademarkType: '',
+          ttbType: 'Full',
+          baseBrand: baseBrand,
+          isExpression: availBrandName !== baseBrand,
+          missingTrademarkConfig: true
+        });
+        console.log(`  No match in Trademark Config: "${availBrandName}" - using fallback`);
       }
     });
-
-    console.log(`STEP 3: Successfully matched ${matchedBrands.length} brands with Trademark Config`);
-    
-    if (unmatchedBrands.length > 0) {
-      console.warn(`WARNING: ${unmatchedBrands.length} brands from Brand Availability could NOT be matched:`);
-      console.warn('Unmatched brands:', unmatchedBrands.slice(0, 20));
-    }
     
     console.log(`========================================`);
-    console.log(`FINAL RESULT: Returning ${matchedBrands.length} brands for ${countryCode}`);
+    console.log(`FINAL RESULT: Returning ${processedBrands.length} brands for ${countryCode}`);
     console.log(`========================================\n`);
     
-    return matchedBrands;
+    return processedBrands;
   }
 
   /**
    * Find matching brand using multiple strategies
-   * @param {string} searchName - Brand name from Brand Availability
+   * @param {string} searchName - Brand name from Brand Availability (or base brand)
    * @param {Array} allBrands - All brands from Trademark Config
    * @returns {Object|null} Matched brand object or null
    */
   findMatchingBrand(searchName, allBrands) {
     if (!searchName) return null;
 
-    // Normalize function - removes special characters and spaces
     const normalize = (str) => {
       if (!str) return '';
       return str
         .toLowerCase()
-        .replace(/[^\w\s]/g, '') // Remove punctuation
-        .replace(/\s+/g, ''); // Remove spaces
+        .replace(/[^\w\s]/g, '')
+        .replace(/\s+/g, '');
     };
 
     const normalizedSearch = normalize(searchName);
 
-    // Strategy 1: Exact match on Display Names
     let match = allBrands.find(b => b.displayNames === searchName);
     if (match) {
-      console.log(`  ✓ Exact match (Display): "${searchName}" -> "${match.displayNames}"`);
+      console.log(`  Exact match (Display): "${searchName}" -> "${match.displayNames}"`);
       return match;
     }
 
-    // Strategy 2: Exact match on Brand Names
     match = allBrands.find(b => b.brandNames === searchName);
     if (match) {
-      console.log(`  ✓ Exact match (Brand): "${searchName}" -> "${match.brandNames}"`);
+      console.log(`  Exact match (Brand): "${searchName}" -> "${match.brandNames}"`);
       return match;
     }
 
-    // Strategy 3: Normalized match on Display Names
     match = allBrands.find(b => normalize(b.displayNames) === normalizedSearch);
     if (match) {
-      console.log(`  ✓ Normalized match (Display): "${searchName}" -> "${match.displayNames}"`);
+      console.log(`  Normalized match (Display): "${searchName}" -> "${match.displayNames}"`);
       return match;
     }
 
-    // Strategy 4: Normalized match on Brand Names
     match = allBrands.find(b => normalize(b.brandNames) === normalizedSearch);
     if (match) {
-      console.log(`  ✓ Normalized match (Brand): "${searchName}" -> "${match.brandNames}"`);
+      console.log(`  Normalized match (Brand): "${searchName}" -> "${match.brandNames}"`);
       return match;
     }
 
-    // Strategy 5: Contains match - search name contains brand name or vice versa
     match = allBrands.find(b => {
       const displayNorm = normalize(b.displayNames);
       const brandNorm = normalize(b.brandNames);
@@ -355,12 +390,11 @@ class ExcelService {
     });
     
     if (match) {
-      console.log(`  ✓ Contains match: "${searchName}" -> "${match.displayNames || match.name}"`);
+      console.log(`  Contains match: "${searchName}" -> "${match.displayNames || match.name}"`);
       return match;
     }
 
-    // No match found
-    console.log(`  ✗ No match found for: "${searchName}"`);
+    console.log(`  No match found for: "${searchName}"`);
     return null;
   }
 
@@ -371,7 +405,7 @@ class ExcelService {
    */
   getTTBType(brandName) {
     if (!this.data || !this.data['Trademark Config']) {
-      return 'Full'; // Default
+      return 'Full';
     }
 
     const brandRow = this.data['Trademark Config'].find(row => 
@@ -542,7 +576,6 @@ class ExcelService {
   }
 }
 
-// Export both the class AND the singleton instance
-export { ExcelService };  // Named export for class (for 'new ExcelService()')
+export { ExcelService };
 const excelService = new ExcelService();
-export default excelService;  // Default export for singleton (for direct use)
+export default excelService;

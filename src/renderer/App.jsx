@@ -5,7 +5,7 @@
 import React, { useState } from 'react';
 import { useExcelData } from './index';
 import templateService from './services/templateService';
-import { ChevronDown, Search, Check, Copy, AlertCircle, Info } from 'lucide-react';
+import { ChevronDown, Search, Check, Copy, AlertCircle, Info, X } from 'lucide-react';
 
 const App = () => {
   // ============================================
@@ -22,6 +22,10 @@ const App = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [showMultiBrandNote, setShowMultiBrandNote] = useState(false);
   
+  // Error popup state
+  const [showErrorPopup, setShowErrorPopup] = useState(false);
+  const [errorPopupMessage, setErrorPopupMessage] = useState('');
+  
   // Generation state
   const [generatedCopy, setGeneratedCopy] = useState(null);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -33,6 +37,105 @@ const App = () => {
   const rawBrands = excelContext.getBrands() || [];
   const countries = excelContext.getCountries() || [];
   const assetTypes = excelContext.getAssetTypes() || [];
+
+  // ============================================
+  // HELPER FUNCTIONS FOR BRAND TYPES
+  // ============================================
+
+  /**
+   * Check if a brand is a multi-brand
+   * @param {string} brandName - Brand name to check
+   * @returns {boolean}
+   */
+  const isMultiBrand = (brandName) => {
+    if (!brandName) return false;
+    const normalized = brandName.toLowerCase().replace(/\s+/g, '');
+    return normalized.includes('(multi-brand)') || normalized.includes('(multibrand)');
+  };
+
+  /**
+   * Check if a brand is FOB
+   * @param {string} brandName - Brand name to check
+   * @returns {boolean}
+   */
+  const isFOBBrand = (brandName) => {
+    if (!brandName) return false;
+    const normalized = brandName.toLowerCase().replace(/\s+/g, '');
+    return normalized.includes('(fob)') || normalized.includes('fob');
+  };
+
+  /**
+   * Get selected brand names
+   * @returns {Array<string>}
+   */
+  const getSelectedBrandNames = () => {
+    return Array.from(selectedBrands)
+      .map(id => availableBrands.find(b => b.id === id)?.name)
+      .filter(Boolean);
+  };
+
+  /**
+   * Check if any selected brands are multi-brand
+   * @returns {boolean}
+   */
+  const hasMultiBrandSelected = () => {
+    const selectedNames = getSelectedBrandNames();
+    return selectedNames.some(name => isMultiBrand(name));
+  };
+
+  /**
+   * Check if any selected brands are FOB
+   * @returns {boolean}
+   */
+  const hasFOBSelected = () => {
+    const selectedNames = getSelectedBrandNames();
+    const result = selectedNames.some(name => isFOBBrand(name));
+    console.log('hasFOBSelected check:', { selectedNames, result });
+    return result;
+  };
+
+  /**
+   * Check if brand should be disabled
+   * @param {Object} brand - Brand object
+   * @returns {boolean}
+   */
+  const isBrandDisabled = (brand) => {
+    if (selectedBrands.has(brand.id)) {
+      return false;
+    }
+
+    const hasMultiBrand = hasMultiBrandSelected();
+    const hasFOB = hasFOBSelected();
+    const brandIsMulti = isMultiBrand(brand.name);
+    const brandIsFOB = isFOBBrand(brand.name);
+
+    console.log('isBrandDisabled check:', {
+      brandName: brand.name,
+      hasMultiBrand,
+      hasFOB,
+      brandIsMulti,
+      brandIsFOB,
+      selectedCount: selectedBrands.size
+    });
+
+    // If multi-brand is selected, disable all other brands
+    if (hasMultiBrand) {
+      return true;
+    }
+
+    // If FOB is selected, disable all non-FOB brands
+    if (hasFOB && !brandIsFOB) {
+      console.log('Disabling non-FOB brand:', brand.name);
+      return true;
+    }
+
+    // If regular brands are selected and this is multi-brand or FOB, disable it
+    if (selectedBrands.size > 0 && !hasFOB && (brandIsMulti || brandIsFOB)) {
+      return true;
+    }
+
+    return false;
+  };
 
   // ============================================
   // EVENT HANDLERS
@@ -47,6 +150,7 @@ const App = () => {
     setSelectedCountry(countryCode);
     setSelectedBrands(new Set());
     setAssetTypeInstructions(null);
+    setShowErrorPopup(false);
     
     if (countryCode) {
       const { default: excelService } = require('./services/excelService');
@@ -59,7 +163,6 @@ const App = () => {
           originalId: brand.id,
           entity: brand.entity
         }))
-        // Sort alphabetically by brand name
         .sort((a, b) => {
           const nameA = (a.name || '').toLowerCase();
           const nameB = (b.name || '').toLowerCase();
@@ -74,19 +177,87 @@ const App = () => {
   };
 
   /**
-   * Handle brand selection toggle
+   * Handle brand selection toggle with validation
    * @param {string} brandId - Brand ID to toggle
    */
   const handleBrandToggle = (brandId) => {
-    const newSelected = new Set(selectedBrands);
-    if (newSelected.has(brandId)) {
+    const brand = availableBrands.find(b => b.id === brandId);
+    if (!brand) return;
+
+    const isSelected = selectedBrands.has(brandId);
+    const brandIsMulti = isMultiBrand(brand.name);
+    const brandIsFOB = isFOBBrand(brand.name);
+
+    console.log('handleBrandToggle:', {
+      brandName: brand.name,
+      isSelected,
+      brandIsMulti,
+      brandIsFOB
+    });
+
+    // If deselecting, just remove it
+    if (isSelected) {
+      const newSelected = new Set(selectedBrands);
       newSelected.delete(brandId);
-    } else {
-      newSelected.add(brandId);
+      setSelectedBrands(newSelected);
+      setShowMultiBrandNote(newSelected.size > 1);
+      setAssetTypeInstructions(null);
+      setShowErrorPopup(false);
+      return;
     }
+
+    // Trying to select a brand
+    const hasOtherBrands = selectedBrands.size > 0;
+    const hasMultiBrand = hasMultiBrandSelected();
+    const hasFOB = hasFOBSelected();
+
+    console.log('Selection validation:', {
+      hasOtherBrands,
+      hasMultiBrand,
+      hasFOB,
+      brandIsMulti,
+      brandIsFOB
+    });
+
+    // Validation rules
+    if (brandIsMulti && hasOtherBrands) {
+      setErrorPopupMessage('Cannot mix single brands with multi-brand selections. Please deselect other brands first.');
+      setShowErrorPopup(true);
+      return;
+    }
+
+    if (brandIsFOB && hasOtherBrands && !hasFOB) {
+      setErrorPopupMessage('Cannot mix FOB brands with non-FOB brands. Please deselect other brands first.');
+      setShowErrorPopup(true);
+      return;
+    }
+
+    if (!brandIsFOB && hasFOB) {
+      setErrorPopupMessage('Cannot mix non-FOB brands with FOB brands. Please deselect FOB brands first.');
+      setShowErrorPopup(true);
+      return;
+    }
+
+    if ((brandIsMulti || brandIsFOB) && hasOtherBrands && !hasFOB && !hasMultiBrand) {
+      setErrorPopupMessage('Cannot mix single brands with multi-brand or FOB selections. Please deselect other brands first.');
+      setShowErrorPopup(true);
+      return;
+    }
+
+    // If all validations pass, add the brand
+    const newSelected = new Set(selectedBrands);
+    newSelected.add(brandId);
     setSelectedBrands(newSelected);
     setShowMultiBrandNote(newSelected.size > 1);
     setAssetTypeInstructions(null);
+  };
+
+  /**
+   * Close error popup
+   */
+  const closeErrorPopup = () => {
+    setShowErrorPopup(false);
+    setErrorPopupMessage('');
   };
 
   /**
@@ -109,7 +280,6 @@ const App = () => {
    * Validates inputs, calls templateService, and displays results
    */
   const handleGenerate = async () => {
-    // Validation
     if (!selectedAssetType) {
       alert('Please select an Asset Type');
       return;
@@ -130,7 +300,6 @@ const App = () => {
     try {
       console.log('App: Starting copy generation...');
       
-      // Get actual brand names from selected IDs
       const selectedBrandNames = Array.from(selectedBrands)
         .map(id => {
           const brand = availableBrands.find(b => b.id === id);
@@ -138,7 +307,6 @@ const App = () => {
         })
         .filter(Boolean);
       
-      // Get the asset type NAME from the ID
       const assetTypeObj = assetTypes.find(at => at.id === selectedAssetType);
       const assetTypeName = assetTypeObj ? assetTypeObj.name : selectedAssetType;
       
@@ -147,7 +315,6 @@ const App = () => {
       console.log('Selected asset type NAME:', assetTypeName);
       console.log('Selected country:', selectedCountry);
       
-      // Get Asset Type Instructions from raw data
       const trademarkConfig = excelContext.rawData?.['Trademark Config'] || [];
       const assetTypeRow = trademarkConfig.find(row => 
         row['Asset Type'] === assetTypeName
@@ -219,22 +386,18 @@ const App = () => {
   const shouldShowEntity = (brand) => {
     if (!brand.entity) return false;
     
-    // Special case: Don't show "Benriach" for "The Glendronach"
     if (brand.name.toLowerCase().includes('glendronach') && 
         brand.entity.toLowerCase().includes('benriach')) {
       return false;
     }
     
-    // Don't show entity if it's the same as the brand name
     const brandLower = brand.name.toLowerCase();
     const entityLower = brand.entity.toLowerCase();
     
-    // Check if brand name contains entity (e.g., "Jack Daniel's Tennessee Whiskey" contains "Jack Daniel's")
     if (brandLower.includes(entityLower) || entityLower.includes(brandLower)) {
       return false;
     }
     
-    // Show entity for other brands where it adds useful context
     return true;
   };
 
@@ -254,18 +417,45 @@ const App = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-slate-50 to-orange-50/30 relative overflow-hidden">
-      {/* Subtle background pattern */}
       <div className="absolute inset-0 opacity-[0.02]" style={{
         backgroundImage: `radial-gradient(circle at 2px 2px, #a2674f 1px, transparent 1px)`,
         backgroundSize: '32px 32px'
       }}></div>
       
       <div className="relative max-w-7xl mx-auto p-6">
-        {/* ============================================
-            HEADER SECTION
-            ============================================ */}
+        {/* Error Popup Modal */}
+        {showErrorPopup && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm animate-fade-in">
+            <div className="bg-white rounded-2xl shadow-2xl p-6 max-w-md w-full mx-4 border-2 border-red-200 animate-scale-in">
+              <div className="flex items-start gap-4">
+                <div className="flex-shrink-0 w-12 h-12 rounded-full bg-red-100 flex items-center justify-center">
+                  <AlertCircle className="w-6 h-6 text-red-600" />
+                </div>
+                <div className="flex-1">
+                  <h3 className="text-lg font-bold text-slate-900 mb-2">Selection Not Allowed</h3>
+                  <p className="text-sm text-slate-700 leading-relaxed">{errorPopupMessage}</p>
+                </div>
+                <button
+                  onClick={closeErrorPopup}
+                  className="flex-shrink-0 w-8 h-8 rounded-full hover:bg-slate-100 flex items-center justify-center transition-colors"
+                >
+                  <X className="w-5 h-5 text-slate-500" />
+                </button>
+              </div>
+              <div className="mt-6 flex justify-end">
+                <button
+                  onClick={closeErrorPopup}
+                  className="px-6 py-2 bg-red-600 text-white rounded-lg font-semibold hover:bg-red-700 transition-colors"
+                >
+                  Got it
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Header Section */}
         <div className="bg-white rounded-2xl shadow-xl p-8 mb-6 border border-slate-200 animate-slide-down relative overflow-hidden">
-          {/* Subtle copper accent line */}
           <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-transparent via-[#a2674f] to-transparent"></div>
           
           <div className="flex items-center justify-between">
@@ -290,9 +480,7 @@ const App = () => {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* ============================================
-              LEFT PANEL - FORM
-              ============================================ */}
+          {/* Left Panel - Form */}
           <div className="lg:col-span-2 space-y-6">
             {/* Asset Type Selector */}
             <div className="bg-white rounded-2xl shadow-lg p-6 border border-slate-200 hover-lift-subtle animate-slide-right">
@@ -383,33 +571,44 @@ const App = () => {
                   <div className="border-2 border-gray-300 rounded-lg p-4 max-h-80 overflow-y-auto bg-white custom-scrollbar">
                     {filteredBrands.length > 0 ? (
                       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                        {filteredBrands.map((brand) => (
-                          <label
-                            key={brand.id}
-                            className="flex items-center gap-3 p-3 rounded-lg hover:bg-gradient-to-r hover:from-[#a2674f]/5 hover:to-[#a2674f]/10 cursor-pointer transition-all duration-200 group border border-transparent hover:border-[#a2674f]/20 hover-lift-micro"
-                          >
-                            <input
-                              type="checkbox"
-                              checked={selectedBrands.has(brand.id)}
-                              onChange={() => handleBrandToggle(brand.id)}
-                              className="w-4 h-4 text-[#a2674f] bg-gray-100 border-gray-300 rounded focus:ring-[#a2674f] focus:ring-2"
-                            />
-                            <div className="flex-1">
-                              <div className="font-medium text-gray-900 text-sm group-hover:text-[#a2674f] transition-colors">
-                                {brand.name}
-                              </div>
-                              {/* Only show entity when it adds useful context, formatted as "by Entity" */}
-                              {shouldShowEntity(brand) && (
-                                <div className="text-xs text-gray-500 italic mt-0.5">
-                                  by {brand.entity}
+                        {filteredBrands.map((brand) => {
+                          const disabled = isBrandDisabled(brand);
+                          return (
+                            <label
+                              key={brand.id}
+                              className={`flex items-center gap-3 p-3 rounded-lg transition-all duration-200 group border ${
+                                disabled
+                                  ? 'opacity-40 cursor-not-allowed bg-gray-50'
+                                  : 'cursor-pointer hover:bg-gradient-to-r hover:from-[#a2674f]/5 hover:to-[#a2674f]/10 border-transparent hover:border-[#a2674f]/20 hover-lift-micro'
+                              }`}
+                            >
+                              <input
+                                type="checkbox"
+                                checked={selectedBrands.has(brand.id)}
+                                onChange={() => handleBrandToggle(brand.id)}
+                                disabled={disabled}
+                                className="w-4 h-4 text-[#a2674f] bg-gray-100 border-gray-300 rounded focus:ring-[#a2674f] focus:ring-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                              />
+                              <div className="flex-1">
+                                <div className={`font-medium text-sm ${
+                                  disabled
+                                    ? 'text-gray-400'
+                                    : 'text-gray-900 group-hover:text-[#a2674f]'
+                                } transition-colors`}>
+                                  {brand.name}
                                 </div>
+                                {shouldShowEntity(brand) && (
+                                  <div className="text-xs text-gray-500 italic mt-0.5">
+                                    by {brand.entity}
+                                  </div>
+                                )}
+                              </div>
+                              {selectedBrands.has(brand.id) && (
+                                <Check className="text-[#a2674f] animate-scale-in" size={16} />
                               )}
-                            </div>
-                            {selectedBrands.has(brand.id) && (
-                              <Check className="text-[#a2674f] animate-scale-in" size={16} />
-                            )}
-                          </label>
-                        ))}
+                            </label>
+                          );
+                        })}
                       </div>
                     ) : (
                       <div className="text-center py-8 text-gray-500 animate-fade-in">
@@ -431,10 +630,9 @@ const App = () => {
             {/* Generate Button */}
             <button
               onClick={handleGenerate}
-              disabled={isGenerating || !selectedAssetType || !selectedCountry || selectedBrands.size === 0}
+              disabled={isGenerating || !selectedAssetType || !selectedCountry || selectedBrands.size === 0 || showErrorPopup}
               className="w-full bg-gradient-to-r from-blue-600 to-blue-700 text-white py-4 px-6 rounded-xl font-semibold text-lg shadow-lg hover:from-blue-700 hover:to-blue-800 disabled:from-slate-300 disabled:to-slate-400 disabled:cursor-not-allowed transition-all transform hover:scale-[1.02] active:scale-[0.98] hover:shadow-xl relative overflow-hidden group"
             >
-              {/* Shimmer effect */}
               <div className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-1000 bg-gradient-to-r from-transparent via-white/20 to-transparent"></div>
               
               {isGenerating ? (
@@ -448,12 +646,9 @@ const App = () => {
             </button>
           </div>
 
-          {/* ============================================
-              RIGHT PANEL - OUTPUT
-              ============================================ */}
+          {/* Right Panel - Output */}
           <div className="lg:col-span-1">
             <div className="bg-white rounded-2xl shadow-lg p-6 border-2 border-slate-200 hover-lift-subtle animate-slide-left relative overflow-hidden" id="generated-copy-section">
-              {/* Copper accent corner */}
               <div className="absolute top-0 right-0 w-20 h-20 bg-gradient-to-br from-[#a2674f]/10 to-transparent rounded-bl-full"></div>
               
               <h2 className="text-xl font-bold text-slate-900 mb-4 flex items-center gap-2">
@@ -519,7 +714,6 @@ const App = () => {
                     />
                   </div>
 
-                  {/* Copy Button */}
                   <button
                     onClick={() => handleCopyToClipboard(generatedCopy.plainText)}
                     className={`w-full flex items-center justify-center gap-2 px-4 py-3 rounded-lg font-semibold transition-all shadow-md hover:shadow-lg transform hover:scale-[1.02] active:scale-[0.98] relative overflow-hidden group ${
@@ -528,7 +722,6 @@ const App = () => {
                         : 'bg-gradient-to-r from-blue-600 to-blue-700 text-white hover:from-blue-700 hover:to-blue-800'
                     }`}
                   >
-                    {/* Shimmer effect */}
                     <div className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-1000 bg-gradient-to-r from-transparent via-white/20 to-transparent"></div>
                     
                     {justCopied ? (
@@ -547,10 +740,8 @@ const App = () => {
               ) : null}
             </div>
 
-            {/* Asset Type Instructions Card */}
             {assetTypeInstructions && generatedCopy && (
               <div className="mt-6 bg-gradient-to-br from-amber-50 to-orange-50 rounded-2xl shadow-lg p-6 border-2 border-amber-200 hover-lift-subtle animate-fade-in relative overflow-hidden">
-                {/* Amber accent corner */}
                 <div className="absolute top-0 right-0 w-20 h-20 bg-gradient-to-br from-amber-300/20 to-transparent rounded-bl-full"></div>
                 
                 <h2 className="text-lg font-bold text-amber-900 mb-4 flex items-center gap-2">
@@ -567,9 +758,6 @@ const App = () => {
           </div>
         </div>
 
-        {/* ============================================
-            DEVELOPMENT INFO (DEV ONLY)
-            ============================================ */}
         {process.env.NODE_ENV === 'development' && (
           <div className="mt-8 bg-white/80 backdrop-blur-sm border border-gray-200 rounded-lg p-4 shadow-sm animate-fade-in">
             <h4 className="text-sm font-medium text-gray-700 mb-2">Development Status</h4>
@@ -590,9 +778,6 @@ const App = () => {
           </div>
         )}
 
-        {/* ============================================
-            FOOTER
-            ============================================ */}
         <footer className="mt-12 pb-6 text-center animate-fade-in">
           <div className="inline-flex items-center gap-2 px-6 py-3 bg-white rounded-full shadow-lg border-2 border-[#a2674f]/20 hover:border-[#a2674f]/40 transition-all hover-lift-subtle">
             <div className="w-2 h-2 rounded-full bg-gradient-to-r from-[#a2674f] to-[#8b5a42] animate-pulse-soft"></div>

@@ -149,8 +149,14 @@ class ExcelService {
         entity: row['Entity Names'] || '',
         brandNames: row['Brand Names'] || '',
         displayNames: row['Display Names'] || '',
+        thirdParty: row['Third Party'] || '',
         trademarkType: row['Trademark Type'] || '',
-        ttbType: row['TTB Type'] || 'Full'
+        ttbType: row['TTB Type'] || 'Full',
+        forwardNoticeType: row['Forward Notice Type'] || '',
+        emailOptinDisplay: row['Email Opt-in Display '] || row['Email Opt-in Display'] || '',
+        portfolio: row['Portfolio?'] || '',
+        assetType: row['Asset Type'] || '',
+        assetTypeInstructions: row['Asset Type Instructions'] || ''
       }))
       .filter(brand => brand.name);
     
@@ -260,18 +266,16 @@ class ExcelService {
 
   /**
    * Get brands available in a specific country
-   * Uses Brand Availability names for display (Column A)
-   * Shows ALL brands from Brand Availability, matches with Trademark Config when possible
+   * Uses Brand Availability as source of truth with Entity Names and Third Party
+   * Merges with Trademark Config for trademark configuration details
    * @param {string} countryCode - Country code (e.g., 'US', 'CA', 'GB')
    * @returns {Array} Array of brand objects available in that country
    */
   getBrandsForCountry(countryCode) {
-    console.log(`\n========================================`);
     console.log(`getBrandsForCountry called for: ${countryCode}`);
-    console.log(`========================================`);
     
     if (!this.data || !this.data['Brand Availability']) {
-      console.warn('Brand Availability sheet not found, returning all brands');
+      console.warn('Brand Availability sheet not found, returning all brands from Trademark Config');
       return this.getBrands();
     }
 
@@ -287,48 +291,49 @@ class ExcelService {
         return countryList.includes(countryCode);
       });
 
-    console.log(`STEP 1: Found ${availableBrandRows.length} brands in Brand Availability for ${countryCode}`);
+    console.log(`Found ${availableBrandRows.length} brands in Brand Availability for ${countryCode}`);
 
-    const allBrands = this.getBrands();
-    console.log(`STEP 2: Found ${allBrands.length} total brands in Trademark Config`);
+    const allTrademarkConfigBrands = this.getBrands();
 
     const processedBrands = [];
     
     availableBrandRows.forEach(row => {
-      const availBrandName = row['Brand Name'];
+      const displayName = row['Brand Name'];
+      const baseBrandName = row['Brand Names'];
+      const entityName = row['Entity Names'];
+      const thirdParty = row['Third Party'];
       
-      const baseBrand = this.extractBaseBrand(availBrandName);
-      const matched = this.findMatchingBrand(baseBrand, allBrands);
+      const matched = this.findMatchingBrand(baseBrandName, allTrademarkConfigBrands);
+      
+      const brandObject = {
+        id: displayName.toLowerCase().replace(/[^a-z0-9]/g, '-'),
+        name: displayName,
+        displayNames: displayName,
+        brandNames: baseBrandName,
+        entity: entityName || '',
+        thirdParty: thirdParty || '',
+        baseBrand: baseBrandName,
+        isExpression: displayName !== baseBrandName,
+        trademarkType: matched?.trademarkType || '',
+        ttbType: matched?.ttbType || 'Full',
+        forwardNoticeType: matched?.forwardNoticeType || '',
+        emailOptinDisplay: matched?.emailOptinDisplay || '',
+        portfolio: matched?.portfolio || '',
+        assetType: matched?.assetType || '',
+        assetTypeInstructions: matched?.assetTypeInstructions || '',
+        missingTrademarkConfig: !matched
+      };
+      
+      processedBrands.push(brandObject);
       
       if (matched) {
-        processedBrands.push({
-          ...matched,
-          name: availBrandName,
-          displayNames: availBrandName,
-          baseBrand: baseBrand,
-          isExpression: availBrandName !== baseBrand
-        });
-        console.log(`  Matched: "${availBrandName}"`);
+        console.log(`  Matched: "${displayName}" -> Base: "${baseBrandName}", Entity: "${entityName}"`);
       } else {
-        processedBrands.push({
-          id: availBrandName.toLowerCase().replace(/[^a-z0-9]/g, '-'),
-          name: availBrandName,
-          displayNames: availBrandName,
-          brandNames: availBrandName,
-          entity: '',
-          trademarkType: '',
-          ttbType: 'Full',
-          baseBrand: baseBrand,
-          isExpression: availBrandName !== baseBrand,
-          missingTrademarkConfig: true
-        });
-        console.log(`  No match in Trademark Config: "${availBrandName}" - using fallback`);
+        console.log(`  No Trademark Config match: "${displayName}" -> Using Brand Availability data only`);
       }
     });
     
-    console.log(`========================================`);
-    console.log(`FINAL RESULT: Returning ${processedBrands.length} brands for ${countryCode}`);
-    console.log(`========================================\n`);
+    console.log(`Returning ${processedBrands.length} brands for ${countryCode}\n`);
     
     return processedBrands;
   }

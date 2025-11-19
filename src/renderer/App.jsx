@@ -137,6 +137,29 @@ const App = () => {
     return false;
   };
 
+  /**
+   * Get selected brand objects
+   * @returns {Array<Object>}
+   */
+  const getSelectedBrandObjects = () => {
+    return Array.from(selectedBrands)
+      .map(id => availableBrands.find(b => b.id === id))
+      .filter(Boolean);
+  };
+
+  /**
+   * Remove a brand from selection
+   * @param {string} brandId - Brand ID to remove
+   */
+  const handleRemoveSelectedBrand = (brandId) => {
+    const newSelected = new Set(selectedBrands);
+    newSelected.delete(brandId);
+    setSelectedBrands(newSelected);
+    setShowMultiBrandNote(newSelected.size > 1);
+    setAssetTypeInstructions(null);
+    setShowErrorPopup(false);
+  };
+
   // ============================================
   // EVENT HANDLERS
   // ============================================
@@ -617,10 +640,34 @@ const App = () => {
                     )}
                   </div>
                   
+                  {/* Selected Brands Chips - Inside Brand Selector Card */}
                   {selectedBrands.size > 0 && (
-                    <div className="mt-3 text-sm text-gray-600 flex items-center gap-2 animate-fade-in">
-                      <div className="w-2 h-2 rounded-full bg-[#a2674f] animate-pulse-soft"></div>
-                      Selected: {selectedBrands.size} brand{selectedBrands.size !== 1 ? 's' : ''}
+                    <div className="mt-4 pt-4 border-t-2 border-gray-200">
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+                          <div className="w-2 h-2 rounded-full bg-[#a2674f] animate-pulse-soft"></div>
+                          Selected: {selectedBrands.size} brand{selectedBrands.size !== 1 ? 's' : ''}
+                        </div>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {getSelectedBrandObjects().map((brand) => (
+                          <div
+                            key={brand.id}
+                            className="inline-flex items-center gap-2 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg px-3 py-2 text-sm animate-fade-in hover:border-blue-300 transition-all group"
+                          >
+                            <span className="font-medium text-slate-800 max-w-[200px] truncate" title={brand.name}>
+                              {brand.name}
+                            </span>
+                            <button
+                              onClick={() => handleRemoveSelectedBrand(brand.id)}
+                              className="flex-shrink-0 w-5 h-5 rounded-full hover:bg-red-100 flex items-center justify-center transition-colors"
+                              title="Remove brand"
+                            >
+                              <X className="w-3.5 h-3.5 text-slate-400 group-hover:text-red-600 transition-colors" />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
                     </div>
                   )}
                 </>

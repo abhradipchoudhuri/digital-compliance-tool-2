@@ -103,7 +103,7 @@ class CopyGenerator {
     console.log('CopyGenerator: Initializing with Excel data...');
 
     // Load all required sheets
-    this.trademarkData = excelData['Trademark Config'] || [];  // Only for asset type configs
+    this.trademarkData = excelData['Trademark Config'] || [];  // For Forward Notice Type and other configs
     this.templates = excelData['Overall Structure'] || [];
     this.trademarkStructure = excelData['Trademark Structure'] || [];
     this.languageData = excelData['Language Dependent Variables'] || [];
@@ -137,6 +137,10 @@ class CopyGenerator {
     if (this.brandAvailability.length > 0) {
       console.log('Brand Availability columns:', Object.keys(this.brandAvailability[0]));
       console.log('First brand:', this.brandAvailability[0]['Brand Name']);
+    }
+
+    if (this.trademarkData.length > 0) {
+      console.log('Trademark Config columns:', Object.keys(this.trademarkData[0]));
     }
 
     this.validateData();
@@ -212,7 +216,7 @@ class CopyGenerator {
         throw new Error(`No language variables found for: ${language}`);
       }
 
-      // Get brand data - NOW USES BRAND AVAILABILITY
+      // Get brand data - NOW USES BRAND AVAILABILITY + TRADEMARK CONFIG
       const brandDataList = this.getBrandData(brandIds);
       if (brandDataList.length === 0) {
         throw new Error(`No brand data found for brands: ${brandIds.join(', ')}`);
@@ -223,7 +227,8 @@ class CopyGenerator {
         expression: b.expressionName,
         isExpression: b.isExpression,
         entity: b['Entity Names'],
-        thirdParty: b['Third Party']
+        thirdParty: b['Third Party'],
+        forwardNoticeType: b['Forward Notice Type']
       })));
 
       // Build the copy from template
@@ -339,8 +344,7 @@ class CopyGenerator {
 
   /**
    * Get brand data for multiple brand IDs
-   * NEW LOGIC: Uses Brand Availability as primary source
-   * No longer requires brands to be in Trademark Config
+   * NEW LOGIC: Merges Brand Availability (entity/third party) with Trademark Config (forward notice)
    * @param {Array<string>} brandIds - Array of brand names/IDs (from Brand Availability)
    * @returns {Array<Object>} Array of brand data objects
    */
@@ -361,13 +365,33 @@ class CopyGenerator {
       }
 
       // Extract data from Brand Availability
-      const displayName = brandRow['Brand Name'];  // e.g., "Benriach 10 Year Old" or "Diplomático Distillery Collection"
-      const baseBrandName = brandRow['Brand Names'];  // e.g., "Benriach" or "Diplomático"
-      const entityName = brandRow['Entity Names'];  // e.g., "Benriach" or "Diplomático Branding, Unipessoal LDA"
+      const displayName = brandRow['Brand Name'];
+      const baseBrandName = brandRow['Brand Names'];
+      const entityName = brandRow['Entity Names'];
       const thirdParty = brandRow['Third Party'] || '';
       
       // Determine if this is an expression (display name differs from base brand)
       const isExpression = displayName !== baseBrandName;
+      
+      // NOW: Also look up Forward Notice Type from Trademark Config
+      // Try to match using base brand name first, then display name
+      let forwardNoticeType = 'NA';
+      
+      const trademarkConfigRow = this.trademarkData.find(row => {
+        const rowBrandNames = row['Brand Names'];
+        const rowDisplayNames = row['Display Names'];
+        
+        return rowBrandNames === baseBrandName || 
+               rowDisplayNames === displayName || 
+               rowBrandNames === displayName;
+      });
+      
+      if (trademarkConfigRow) {
+        forwardNoticeType = trademarkConfigRow['Forward Notice Type'] || 'NA';
+        console.log(`Found Forward Notice Type in Trademark Config for "${displayName}": ${forwardNoticeType}`);
+      } else {
+        console.log(`No Trademark Config entry found for "${displayName}", using default Forward Notice Type: NA`);
+      }
       
       // Build brand data object
       const brandData = {
@@ -381,12 +405,12 @@ class CopyGenerator {
         expressionName: isExpression ? displayName : null,
         isExpression: isExpression,
         
-        // Default values (not in Brand Availability)
-        'Forward Notice Type': 'NA',  // Default
+        // From Trademark Config
+        'Forward Notice Type': forwardNoticeType,
         'TTB Type': 'Full'  // Default - will be overridden by asset type mapping
       };
 
-      console.log(`Brand found: "${displayName}" -> Base: "${baseBrandName}", Entity: "${entityName}"`);
+      console.log(`Brand found: "${displayName}" -> Base: "${baseBrandName}", Entity: "${entityName}", Forward Notice: "${forwardNoticeType}"`);
       
       brandDataList.push(brandData);
     }
@@ -900,9 +924,8 @@ class CopyGenerator {
 
   /**
    * Build trademark section for selected brands
-   * Handles singular/plural formatting, portfolio prefixes, and entity copyrights
-   * For expressions, uses BASE brand name (not the expression)
-   * Uses Entity Names from Brand Availability
+   * For expressions: Shows BOTH the entity/portfolio brand AND the expression name
+   * E.g., "Jack Daniel's Old No.7" -> shows both "Jack Daniel's" and "Old No.7"
    * @param {Array<Object>} brandDataList - Array of brand data
    * @param {string} language - Language name
    * @param {string} assetType - Asset type name
@@ -1024,15 +1047,38 @@ class CopyGenerator {
       
       console.log(`Same entity check: ${sameEntity}, Entity: ${portfolioEntity}`);
       
-      let brandNames = brandDataList.map(b => b['Brand Names'] || b['Display Names']);
-      
-      if (portfolioEntity && portfolioEntity !== 'Brown-Forman Corporation' && portfolioEntity !== 'Brown-Forman') {
-        const portfolioInBrands = brandNames.some(name => name.includes(portfolioEntity));
-        if (!portfolioInBrands) {
-          brandNames = [portfolioEntity, ...brandNames];
-          console.log(`Prepended portfolio entity "${portfolioEntity}" to brand list`);
+      // FIXED: For expressions, show BOTH entity AND expression
+      let brandNames = [];
+      brandDataList.forEach(b => {
+        const displayName = b['Display Names'];
+        const baseBrandName = b['Brand Names'];
+        const entityName = b['Entity Names'];
+        const isExpression = b.isExpression;
+        
+        console.log(`Processing for trademark: Display="${displayName}", Base="${baseBrandName}", Entity="${entityName}", IsExpression=${isExpression}`);
+        
+        // If it's an expression and has an entity/portfolio brand
+        if (isExpression && entityName) {
+          // Add entity if not already added
+          if (!brandNames.includes(entityName)) {
+            brandNames.push(entityName);
+            console.log(`  Added entity: ${entityName}`);
+          }
+          // Add the base brand name (expression part)
+          if (baseBrandName && !brandNames.includes(baseBrandName)) {
+            brandNames.push(baseBrandName);
+            console.log(`  Added expression: ${baseBrandName}`);
+          }
+        } else {
+          // Regular brand - just add the brand name
+          if (!brandNames.includes(baseBrandName)) {
+            brandNames.push(baseBrandName || displayName);
+            console.log(`  Added regular brand: ${baseBrandName || displayName}`);
+          }
         }
-      }
+      });
+      
+      console.log(`Final brand names for trademark: ${brandNames.join(', ')}`);
       
       const conjunction = this.safeGetValue(effectiveTmLangData['Conjuction'], 'Conjuction') || 'and';
       
@@ -1093,7 +1139,7 @@ class CopyGenerator {
 
   // ============================================
   // TEMPLATE PROCESSING
-  // (Rest of the file continues with buildCopyFromTemplate and other methods...)
+  // (Continues with buildCopyFromTemplate and other methods...)
   // ============================================
 
   buildCopyFromTemplate(template, langVars, brandDataList, countryCode, language, assetType) {
@@ -1177,9 +1223,9 @@ class CopyGenerator {
       console.log('Replaced: Trademark');
     }
 
-    // Replace Forward Notice
+    // Replace Forward Notice - CORRECTED LOGIC
     if (copyText.includes('<<Forward Notice>>')) {
-      const forwardNotice = this.getForwardNotice(brandDataList, langVars);
+      const forwardNotice = this.getForwardNotice(brandDataList, langVars, assetType);
       copyText = copyText.replace(/<<Forward Notice>>/g, forwardNotice);
       console.log('Replaced: Forward Notice');
     }
@@ -1370,24 +1416,67 @@ class CopyGenerator {
     };
   }
 
-  getForwardNotice(brandDataList, langVars) {
-    const needsForwardNotice = brandDataList.some(b => 
-      b['Forward Notice Type'] && b['Forward Notice Type'] !== 'NA'
+  /**
+   * Get Forward Notice text based on brand requirements and asset type
+   * Checks: 
+   * 1. Do any brands need Forward Notice? (from Trademark Config Column K)
+   * 2. What type? (Full or Tightened)
+   * 3. Get text from Language Dependent Variables
+   * @param {Array<Object>} brandDataList - Array of brand data
+   * @param {Object} langVars - Language variables
+   * @param {string} assetType - Asset type name
+   * @returns {string} Forward Notice text or empty string
+   */
+  getForwardNotice(brandDataList, langVars, assetType) {
+    console.log(`=== Forward Notice Logic Start ===`);
+    console.log(`Asset Type: ${assetType}`);
+    console.log(`Number of brands: ${brandDataList.length}`);
+    
+    // Check if any brand requires Forward Notice
+    const brandsNeedingForwardNotice = brandDataList.filter(b => 
+      b['Forward Notice Type'] && b['Forward Notice Type'] !== 'NA' && b['Forward Notice Type'] !== 'N/A'
     );
-
-    if (!needsForwardNotice) {
+    
+    console.log(`Brands needing Forward Notice: ${brandsNeedingForwardNotice.length}`);
+    brandsNeedingForwardNotice.forEach(b => {
+      console.log(`  - ${b['Display Names']}: ${b['Forward Notice Type']}`);
+    });
+    
+    if (brandsNeedingForwardNotice.length === 0) {
+      console.log('No brands require Forward Notice');
+      console.log(`=== Forward Notice Logic End ===`);
       return '';
     }
-
-    const forwardNoticeType = brandDataList[0]['Forward Notice Type'];
-
-    if (forwardNoticeType === 'Full') {
-      return this.safeGetValue(langVars['Forward Notice Full'], 'Forward Notice Full');
-    } else if (forwardNoticeType === 'Tightened') {
-      return this.safeGetValue(langVars['Forward Notice Tightened'], 'Forward Notice Tightened');
+    
+    // Get the Forward Notice Type from the first brand that needs it
+    // (In practice, all selected brands should have the same Forward Notice Type requirement)
+    const forwardNoticeType = brandsNeedingForwardNotice[0]['Forward Notice Type'];
+    
+    console.log(`Forward Notice Type to use: ${forwardNoticeType}`);
+    
+    // Get the appropriate text from Language Dependent Variables
+    let forwardNoticeText = '';
+    
+    if (forwardNoticeType === 'Full' || forwardNoticeType === 'full') {
+      forwardNoticeText = this.safeGetValue(
+        langVars['Forward Notice Full'] || langVars['Forward Notice - Full'],
+        'Forward Notice Full'
+      );
+      console.log(`Using Forward Notice Full`);
+    } else if (forwardNoticeType === 'Tightened' || forwardNoticeType === 'tightened') {
+      forwardNoticeText = this.safeGetValue(
+        langVars['Forward Notice Tightened'] || langVars['Forward Notice - Tightened'],
+        'Forward Notice Tightened'
+      );
+      console.log(`Using Forward Notice Tightened`);
+    } else {
+      console.warn(`Unknown Forward Notice Type: ${forwardNoticeType}`);
     }
-
-    return '';
+    
+    console.log(`Forward Notice Text: ${forwardNoticeText.substring(0, 100)}...`);
+    console.log(`=== Forward Notice Logic End ===`);
+    
+    return forwardNoticeText;
   }
 
   // ============================================

@@ -2,10 +2,68 @@
 // Main Application Component - Legal Copy Generator Interface
 // Handles UI, form state, and copy generation workflow
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useExcelData } from './index';
 import templateService from './services/templateService';
-import { ChevronDown, Search, Check, Copy, AlertCircle, Info, X } from 'lucide-react';
+import { ChevronDown, Search, Check, Copy, AlertCircle, Info, X, XCircle } from 'lucide-react';
+
+// ============================================
+// FEATURE: Console Log Buffer (for Ctrl+Shift+L copy)
+// ============================================
+if (!window.__consoleBuffer) {
+  window.__consoleBuffer = [];
+  
+  const originalLog = console.log;
+  const originalWarn = console.warn;
+  const originalError = console.error;
+  
+  const MAX_BUFFER_SIZE = 1000;
+  
+  console.log = function(...args) {
+    const timestamp = new Date().toISOString();
+    const message = args.map(arg => 
+      typeof arg === 'object' ? JSON.stringify(arg, null, 2) : String(arg)
+    ).join(' ');
+    
+    window.__consoleBuffer.push(`[${timestamp}] [LOG] ${message}`);
+    
+    if (window.__consoleBuffer.length > MAX_BUFFER_SIZE) {
+      window.__consoleBuffer.shift();
+    }
+    
+    originalLog.apply(console, args);
+  };
+  
+  console.warn = function(...args) {
+    const timestamp = new Date().toISOString();
+    const message = args.map(arg => 
+      typeof arg === 'object' ? JSON.stringify(arg, null, 2) : String(arg)
+    ).join(' ');
+    
+    window.__consoleBuffer.push(`[${timestamp}] [WARN] ${message}`);
+    
+    if (window.__consoleBuffer.length > MAX_BUFFER_SIZE) {
+      window.__consoleBuffer.shift();
+    }
+    
+    originalWarn.apply(console, args);
+  };
+  
+  console.error = function(...args) {
+    const timestamp = new Date().toISOString();
+    const message = args.map(arg => 
+      typeof arg === 'object' ? JSON.stringify(arg, null, 2) : String(arg)
+    ).join(' ');
+    
+    window.__consoleBuffer.push(`[${timestamp}] [ERROR] ${message}`);
+    
+    if (window.__consoleBuffer.length > MAX_BUFFER_SIZE) {
+      window.__consoleBuffer.shift();
+    }
+    
+    originalError.apply(console, args);
+  };
+}
 
 const App = () => {
   // ============================================
@@ -37,6 +95,41 @@ const App = () => {
   const rawBrands = excelContext.getBrands() || [];
   const countries = excelContext.getCountries() || [];
   const assetTypes = excelContext.getAssetTypes() || [];
+
+  // ============================================
+  // FEATURE: Keyboard Shortcut for Console Log Copy (Ctrl+Shift+L)
+  // ============================================
+  useEffect(() => {
+    const handleKeyPress = (e) => {
+      if (e.ctrlKey && e.shiftKey && e.key === 'L') {
+        e.preventDefault();
+        copyAllConsoleLogs();
+      }
+    };
+    
+    window.addEventListener('keydown', handleKeyPress);
+    return () => window.removeEventListener('keydown', handleKeyPress);
+  }, []);
+
+  // ============================================
+  // FEATURE: Copy Console Logs Function
+  // ============================================
+  const copyAllConsoleLogs = () => {
+    try {
+      const logs = window.__consoleBuffer || [];
+      const logText = logs.join('\n');
+      
+      navigator.clipboard.writeText(logText).then(() => {
+        alert(`✅ Console logs copied to clipboard!\n\n${logs.length} log entries copied.\n\nPress Ctrl+V to paste.`);
+      }).catch(err => {
+        console.error('Failed to copy logs:', err);
+        alert('❌ Failed to copy logs to clipboard. Please check console for details.');
+      });
+    } catch (error) {
+      console.error('Error copying console logs:', error);
+      alert('❌ Error copying logs. See console for details.');
+    }
+  };
 
   // ============================================
   // HELPER FUNCTIONS FOR BRAND TYPES
@@ -296,6 +389,31 @@ const App = () => {
       setShowMultiBrandNote(allIds.size > 1);
     }
     setAssetTypeInstructions(null);
+  };
+
+  // ============================================
+  // FEATURE: Clear All Selection Handler
+  // ============================================
+  const handleClearAll = () => {
+    console.log('Clear All: Resetting all selections');
+    
+    // Clear selected brands
+    setSelectedBrands(new Set());
+    
+    // Clear generated copy
+    setGeneratedCopy(null);
+    
+    // Clear search query
+    setSearchQuery('');
+    
+    // Clear any errors
+    setCopyError(null);
+    setShowErrorPopup(false);
+    
+    // Clear instructions
+    setAssetTypeInstructions(null);
+    
+    console.log('Clear All: Complete');
   };
 
   /**
@@ -783,6 +901,15 @@ const App = () => {
                       </>
                     )}
                   </button>
+
+                  {/* FEATURE: Clear All Button - Added below Copy to Clipboard */}
+                  <button
+                    onClick={handleClearAll}
+                    className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-lg transition-all border-2 border-slate-200 hover:border-slate-300 transform hover:scale-[1.02] active:scale-[0.98]"
+                  >
+                    <XCircle className="w-4 h-4" />
+                    Clear All Selection
+                  </button>
                 </div>
               ) : null}
             </div>
@@ -805,25 +932,7 @@ const App = () => {
           </div>
         </div>
 
-        {process.env.NODE_ENV === 'development' && (
-          <div className="mt-8 bg-white/80 backdrop-blur-sm border border-gray-200 rounded-lg p-4 shadow-sm animate-fade-in">
-            <h4 className="text-sm font-medium text-gray-700 mb-2">Development Status</h4>
-            <div className="text-xs text-gray-600 space-y-1">
-              <div>All Brands in DB: {rawBrands.length}</div>
-              <div>Brands for Selected Country: {availableBrands.length}</div>
-              <div>Countries loaded: {countries.length}</div>
-              <div>Asset Types loaded: {assetTypes.length}</div>
-              <div>Template Service: Initialized</div>
-              <div>Copy Generator: Ready</div>
-              {selectedCountry && (
-                <div className="mt-2 pt-2 border-t border-gray-300">
-                  <div className="font-semibold">Selected Country: {selectedCountry}</div>
-                  <div>Available Brands: {availableBrands.map(b => b.name).join(', ')}</div>
-                </div>
-              )}
-            </div>
-          </div>
-        )}
+        {/* FEATURE: Development Status Card REMOVED as requested */}
 
         <footer className="mt-12 pb-6 text-center animate-fade-in">
           <div className="inline-flex items-center gap-2 px-6 py-3 bg-white rounded-full shadow-lg border-2 border-[#a2674f]/20 hover:border-[#a2674f]/40 transition-all hover-lift-subtle">

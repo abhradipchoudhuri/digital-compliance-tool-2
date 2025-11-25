@@ -1,9 +1,10 @@
 // src/renderer/services/copyGenerator.js
 // Core Copy Generation Engine
-// FIXED: 
-// 1. Jack Daniel's ABV range for same-class multi-brand
-// 2. Benriach singular trademark (single brand should not use portfolio logic)
-// 3. Diplomático multi-brand trademark (should show only base brand, singular form)
+// COMPREHENSIVE FIX:
+// 1. Fixed [object Object] RDM issue by using safeGetValue for all US RMD returns
+// 2. Fixed multi-brand same-entity RDM (Jack Daniel's Old No.7 + Bonded Series)
+// 3. Added Third Party info to trademark section (for Sinatra and others)
+// 4. All asset types now correctly use US RMD for same-entity multi-brand
 
 class CopyGenerator {
   constructor() {
@@ -427,7 +428,7 @@ class CopyGenerator {
         'TTB Type': 'Full'
       };
 
-      console.log(`Brand found: "${displayName}" -> Base: "${baseBrandName}", Entity: "${entityName}", Forward Notice: "${forwardNoticeType}"`);
+      console.log(`Brand found: "${displayName}" -> Base: "${baseBrandName}", Entity: "${entityName}", Third Party: "${thirdParty}", Forward Notice: "${forwardNoticeType}"`);
       
       brandDataList.push(brandData);
     }
@@ -1070,8 +1071,9 @@ class CopyGenerator {
     });
     
     if (usRMDRow) {
-      console.log(`Found US RMD (exact match): ${usRMDRow['US RMD']}`);
-      return usRMDRow['US RMD'] || '';
+      const rmdValue = this.safeGetValue(usRMDRow['US RMD'], 'US RMD');
+      console.log(`Found US RMD (exact match): ${rmdValue}`);
+      return rmdValue;
     }
     
     usRMDRow = this.usResponsibilityMessage.find(row => {
@@ -1086,8 +1088,9 @@ class CopyGenerator {
     });
     
     if (usRMDRow) {
-      console.log(`Found US RMD (normalized match): ${usRMDRow['US RMD']}`);
-      return usRMDRow['US RMD'] || '';
+      const rmdValue = this.safeGetValue(usRMDRow['US RMD'], 'US RMD');
+      console.log(`Found US RMD (normalized match): ${rmdValue}`);
+      return rmdValue;
     }
     
     usRMDRow = this.usResponsibilityMessage.find(row => {
@@ -1105,8 +1108,9 @@ class CopyGenerator {
     });
     
     if (usRMDRow) {
-      console.log(`Found US RMD (fuzzy match): ${usRMDRow['US RMD']}`);
-      return usRMDRow['US RMD'] || '';
+      const rmdValue = this.safeGetValue(usRMDRow['US RMD'], 'US RMD');
+      console.log(`Found US RMD (fuzzy match): ${rmdValue}`);
+      return rmdValue;
     }
     
     const baseBrand = this.excelService.extractBaseBrand(brandName);
@@ -1210,7 +1214,7 @@ class CopyGenerator {
     
     let trademarkText = '';
     
-    // FIX 3: For multiple expressions of same brand, treat as singular with just base brand name
+    // FIX 3 & FIX 8: For single brand or multiple expressions of same brand, include Third Party info
     if (brandDataList.length === 1 || isMultipleSameBrand) {
       let brandName;
       let entityName;
@@ -1220,6 +1224,7 @@ class CopyGenerator {
         // FIX 3: Use only the base brand name
         brandName = baseBrands[0];
         entityName = brandDataList[0]['Entity Names'] || '';
+        // FIX 8: Get Third Party from first brand (or any brand since same base)
         thirdParty = brandDataList[0]['Third Party'] || '';
         console.log(`FIX 3: Using singular form with base brand only: "${brandName}"`);
       } else {
@@ -1251,10 +1256,11 @@ class CopyGenerator {
         'Reserve Language'
       );
       
+      // FIX 8: Include Third Party info if present
       if (thirdParty && thirdParty.trim()) {
         const reserveWithThirdParty = thirdParty.trim() + ' ' + reserveLanguage;
         trademarkText = trademarkText.replace(/<<Reserve Language>>/g, reserveWithThirdParty);
-        console.log(`Added Third Party info before Reserve Language: ${thirdParty}`);
+        console.log(`FIX 8: Added Third Party info before Reserve Language: "${thirdParty}"`);
       } else {
         trademarkText = trademarkText.replace(/<<Reserve Language>>/g, reserveLanguage);
       }
@@ -1356,6 +1362,15 @@ class CopyGenerator {
       
       console.log(`Reserve Language value: "${reserveLanguage}"`);
       
+      // FIX 8: Check if any brand has Third Party info
+      const brandsWithThirdParty = brandDataList.filter(b => b['Third Party'] && b['Third Party'].trim());
+      let thirdPartyInfo = '';
+      if (brandsWithThirdParty.length > 0) {
+        // Use Third Party from first brand that has it
+        thirdPartyInfo = brandsWithThirdParty[0]['Third Party'].trim();
+        console.log(`FIX 8: Found Third Party info in multi-brand: "${thirdPartyInfo}"`);
+      }
+      
       const parts = [];
       
       if (preBrand) {
@@ -1366,7 +1381,11 @@ class CopyGenerator {
       parts.push(registeredLanguage);
       parts.push(entityCopyrights);
       
-      if (reserveLanguage) {
+      // FIX 8: Add Third Party info before Reserve Language if present
+      if (thirdPartyInfo && reserveLanguage) {
+        parts.push(thirdPartyInfo + ' ' + reserveLanguage);
+        console.log(`FIX 8: Added Third Party info to multi-brand trademark`);
+      } else if (reserveLanguage) {
         parts.push(reserveLanguage);
       }
       
@@ -1395,6 +1414,7 @@ class CopyGenerator {
     }
     const ttbType = ttbTypeForAsset || 'Full';
 
+    // COMPREHENSIVE FIX: RDM logic with safeGetValue to prevent [object Object]
     if (copyText.includes('<<Responsibility Language>>')) {
       let respLang = '';
       
@@ -1405,40 +1425,38 @@ class CopyGenerator {
           const usRMD = this.getUSResponsibilityMessage(brandName);
           if (usRMD) {
             respLang = usRMD;
-            console.log(`Using US-specific Responsibility Language (single brand): ${usRMD}`);
+            console.log(`✓ Using US RMD (single brand): "${usRMD}"`);
           }
         } else {
-          // Multi-brand - check for RDM US X Brand column
-          console.log('Multi-brand selection - checking for RDM US X Brand');
+          // Multi-brand - check if same entity or cross-selection
+          console.log('=== RESPONSIBILITY LANGUAGE: Multi-brand Selection ===');
           
-          // Get first brand to look up multi-brand RDM
-          const firstBrandName = brandDataList[0]['Brand Names'] || brandDataList[0]['Display Names'];
-          const usRMDRow = this.usResponsibilityMessage.find(row => {
-            const rowBrandName = row['Brand Name'];
-            return rowBrandName && (
-              rowBrandName === firstBrandName ||
-              rowBrandName.toLowerCase().includes(firstBrandName.toLowerCase()) ||
-              firstBrandName.toLowerCase().includes(rowBrandName.toLowerCase())
-            );
-          });
+          const entities = [...new Set(brandDataList.map(b => b['Entity Names']).filter(Boolean))];
+          const sameEntity = entities.length === 1;
           
-          if (usRMDRow) {
-            // Check for multi-brand RDM column
-            const multiBrandRDM = usRMDRow['RDM US X Brand'] || 
-                                  usRMDRow['RDM US XBrand'] ||
-                                  usRMDRow['US RDM X Brand'];
+          console.log(`Entities in selection: [${entities.join(', ')}]`);
+          console.log(`Same entity: ${sameEntity}`);
+          
+          if (sameEntity) {
+            // Same entity - use US RMD column (same as single brand)
+            console.log('✓ SAME ENTITY detected - using US RMD column');
             
-            if (multiBrandRDM) {
-              respLang = multiBrandRDM;
-              console.log(`Using multi-brand RDM from RDM US X Brand column: ${multiBrandRDM}`);
+            const firstBrandName = brandDataList[0]['Brand Names'] || brandDataList[0]['Display Names'];
+            const usRMD = this.getUSResponsibilityMessage(firstBrandName);
+            
+            if (usRMD) {
+              respLang = usRMD;
+              console.log(`✓✓ SUCCESS: Using US RMD for same entity`);
+              console.log(`RDM: "${usRMD}"`);
             } else {
-              // Fallback to generic
+              console.warn(`⚠ No US RMD found for ${firstBrandName}, using generic`);
               respLang = 'Please Drink Responsibly.';
-              console.log(`No multi-brand RDM found, using generic`);
             }
           } else {
+            // Cross-selection (different entities) - use generic
+            console.log('✗ CROSS-SELECTION detected (different entities)');
+            console.log('Using generic RDM: "Please Drink Responsibly."');
             respLang = 'Please Drink Responsibly.';
-            console.log(`No US RMD row found, using generic`);
           }
         }
       }
@@ -1448,11 +1466,11 @@ class CopyGenerator {
           langVars['Responsibility Language '] || langVars['Responsibility Language'],
           'Responsibility Language'
         );
-        console.log(`Using default Responsibility Language: ${respLang}`);
+        console.log(`Using default Responsibility Language from langVars: ${respLang}`);
       }
       
       copyText = copyText.replace(/<<Responsibility Language>>/g, respLang);
-      console.log('Replaced: Responsibility Language');
+      console.log('✓ Replaced: Responsibility Language');
     }
 
     if (copyText.includes('<<TTB>>')) {
@@ -1732,6 +1750,8 @@ class CopyGenerator {
       if (value.text) return String(value.text);
       if (value.value) return String(value.value);
       if (value.content) return String(value.content);
+      if (value.v) return String(value.v); // Excel cell value property
+      if (value.w) return String(value.w); // Excel formatted text property
       
       if (Array.isArray(value)) {
         return value.join(' ');

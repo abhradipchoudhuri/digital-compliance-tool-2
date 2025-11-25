@@ -1,6 +1,9 @@
 // src/renderer/services/copyGenerator.js
 // Core Copy Generation Engine
-// FIXED: Jack Daniel's scenario detection order
+// FIXED: 
+// 1. Jack Daniel's ABV range for same-class multi-brand
+// 2. Benriach singular trademark (single brand should not use portfolio logic)
+// 3. Diplomático multi-brand trademark (should show only base brand, singular form)
 
 class CopyGenerator {
   constructor() {
@@ -268,6 +271,110 @@ class CopyGenerator {
   getBrandData(brandIds) {
     const brandDataList = [];
 
+    // Helper function for fuzzy matching
+    const normalizeForMatch = (str) => {
+      if (!str) return '';
+      return str.toLowerCase().trim()
+        .replace(/[^\w\s]/g, '')
+        .replace(/\s+/g, '');
+    };
+
+    const findTrademarkConfigRow = (displayName, baseBrandName) => {
+      console.log(`Looking for Forward Notice Type - Display: "${displayName}", Base: "${baseBrandName}"`);
+      
+      // Strategy 1: Exact match on Display Names
+      let match = this.trademarkData.find(row => 
+        row['Display Names'] === displayName
+      );
+      if (match) {
+        console.log(`  ✓ Exact match on Display Names: "${match['Display Names']}"`);
+        return match;
+      }
+
+      // Strategy 2: Exact match on Brand Names (base brand)
+      match = this.trademarkData.find(row => 
+        row['Brand Names'] === baseBrandName
+      );
+      if (match) {
+        console.log(`  ✓ Exact match on Brand Names: "${match['Brand Names']}"`);
+        return match;
+      }
+
+      // Strategy 3: Exact match on Brand Names with display name
+      match = this.trademarkData.find(row => 
+        row['Brand Names'] === displayName
+      );
+      if (match) {
+        console.log(`  ✓ Exact match on Brand Names with display: "${match['Brand Names']}"`);
+        return match;
+      }
+
+      // Strategy 4: Normalized matching
+      const normalizedDisplay = normalizeForMatch(displayName);
+      const normalizedBase = normalizeForMatch(baseBrandName);
+      
+      match = this.trademarkData.find(row => {
+        const rowDisplay = normalizeForMatch(row['Display Names']);
+        const rowBrand = normalizeForMatch(row['Brand Names']);
+        
+        return rowDisplay === normalizedDisplay || 
+               rowBrand === normalizedBase ||
+               rowBrand === normalizedDisplay;
+      });
+      
+      if (match) {
+        console.log(`  ✓ Normalized match: "${match['Display Names'] || match['Brand Names']}"`);
+        return match;
+      }
+
+      // Strategy 5: Contains matching (for expressions)
+      match = this.trademarkData.find(row => {
+        const rowDisplay = normalizeForMatch(row['Display Names']);
+        const rowBrand = normalizeForMatch(row['Brand Names']);
+        
+        return (normalizedDisplay.includes(rowBrand) && rowBrand.length > 3) ||
+               (normalizedBase.includes(rowBrand) && rowBrand.length > 3);
+      });
+      
+      if (match) {
+        console.log(`  ✓ Contains match: "${match['Display Names'] || match['Brand Names']}"`);
+        return match;
+      }
+
+      // Strategy 6: Split comma-separated base names and try each part
+      if (baseBrandName && baseBrandName.includes(',')) {
+        console.log(`  Trying comma-separated parts of: "${baseBrandName}"`);
+        const parts = baseBrandName.split(',').map(p => p.trim());
+        
+        for (const part of parts) {
+          console.log(`    Trying part: "${part}"`);
+          
+          // Try exact match on this part
+          match = this.trademarkData.find(row => 
+            row['Brand Names'] === part
+          );
+          if (match) {
+            console.log(`  ✓ Exact match on comma-separated part: "${match['Brand Names']}"`);
+            return match;
+          }
+          
+          // Try normalized match on this part
+          const normalizedPart = normalizeForMatch(part);
+          match = this.trademarkData.find(row => {
+            const rowBrand = normalizeForMatch(row['Brand Names']);
+            return rowBrand === normalizedPart;
+          });
+          if (match) {
+            console.log(`  ✓ Normalized match on comma-separated part: "${match['Brand Names']}"`);
+            return match;
+          }
+        }
+      }
+
+      console.log(`  ✗ No match found in Trademark Config`);
+      return null;
+    };
+
     for (const brandId of brandIds) {
       console.log(`Looking up brand: "${brandId}"`);
       
@@ -289,20 +396,24 @@ class CopyGenerator {
       
       let forwardNoticeType = 'NA';
       
-      const trademarkConfigRow = this.trademarkData.find(row => {
-        const rowBrandNames = row['Brand Names'];
-        const rowDisplayNames = row['Display Names'];
-        
-        return rowBrandNames === baseBrandName || 
-               rowDisplayNames === displayName || 
-               rowBrandNames === displayName;
-      });
+      const trademarkConfigRow = findTrademarkConfigRow(displayName, baseBrandName);
       
       if (trademarkConfigRow) {
         forwardNoticeType = trademarkConfigRow['Forward Notice Type'] || 'NA';
-        console.log(`Found Forward Notice Type in Trademark Config for "${displayName}": ${forwardNoticeType}`);
+        console.log(`✓ Found Forward Notice Type for "${displayName}": ${forwardNoticeType}`);
+        
+        // DETAILED DEBUG: Show all columns for this row
+        if (forwardNoticeType === 'NA' || !forwardNoticeType) {
+          console.warn(`⚠ Forward Notice Type is "${forwardNoticeType}" for "${displayName}"`);
+          console.log(`  Trademark Config row data:`, {
+            'Display Names': trademarkConfigRow['Display Names'],
+            'Brand Names': trademarkConfigRow['Brand Names'],
+            'Forward Notice Type': trademarkConfigRow['Forward Notice Type']
+          });
+        }
       } else {
-        console.log(`No Trademark Config entry found for "${displayName}", using default Forward Notice Type: NA`);
+        console.warn(`✗ No Trademark Config entry found for "${displayName}", defaulting to NA`);
+        console.log(`  Tried to match with Display="${displayName}", Base="${baseBrandName}"`);
       }
       
       const brandData = {
@@ -591,7 +702,7 @@ class CopyGenerator {
       return result;
     }
     
-    // Get TTB data for all brands - use Column D for class type
+    // Get TTB data for all brands
     const ttbData = brandDataList.map(brandData => {
       const brandName = brandData.expressionName || brandData['Brand Names'] || brandData['Display Names'];
       const displayName = brandData['Display Names'];
@@ -599,20 +710,23 @@ class CopyGenerator {
       const ttbRow = this.getTTBRow(brandName, displayName);
       const parsed = this.parseTTBStatement(statement);
       
-      // Get class type from Column D - try multiple column name variations
-      let classTypeFromSheet = null;
+      // Read Column D - Class & Type
+      let classFromColumnD = null;
       if (ttbRow) {
-        classTypeFromSheet = ttbRow['Class & Type'] || 
-                            ttbRow['Class&Type'] || 
-                            ttbRow['ClassType'] || 
-                            ttbRow['Class and Type'] ||
-                            ttbRow['Class'];
+        classFromColumnD = ttbRow['Class & Type'] || 
+                          ttbRow['Class&Type'] || 
+                          ttbRow['Class and Type'] ||
+                          ttbRow['ClassType'] || 
+                          ttbRow['Class'];
         
-        console.log(`Brand "${brandName}" -> Column D class: "${classTypeFromSheet}"`);
-        if (!classTypeFromSheet) {
-          console.warn(`Could not find class type in Column D for ${brandName}`);
-          console.log('Available columns:', Object.keys(ttbRow).slice(0, 10));
+        if (classFromColumnD) {
+          console.log(`Brand "${brandName}" -> Column D: "${classFromColumnD}"`);
+        } else {
+          console.warn(`Brand "${brandName}" -> NO Column D data found!`);
+          console.log(`  Available columns in TTB row:`, ttbRow ? Object.keys(ttbRow).slice(0, 10) : 'null');
         }
+      } else {
+        console.warn(`Brand "${brandName}" -> TTB row is NULL`);
       }
       
       return {
@@ -620,127 +734,287 @@ class CopyGenerator {
         statement,
         ttbRow,
         parsed,
-        classType: classTypeFromSheet  // Use Column D directly
+        classFromColumnD: classFromColumnD
       };
-    }).filter(data => data.statement);  // Keep all brands that have TTB statements
+    }).filter(data => data.statement);
     
     if (ttbData.length === 0) {
-      console.log('No TTB data found for any brand');
+      console.log('No TTB data found');
       console.log(`=== TTB SECTION BUILD END ===\n`);
       return '';
     }
     
     console.log(`TTB data collected for ${ttbData.length} brands`);
-    ttbData.forEach(d => {
-      console.log(`  - ${d.brandName}: classType="${d.classType}", hasABV=${d.parsed?.abvNumeric?.length > 0}`);
-    });
+    
+    // Check entities
+    const entities = [...new Set(brandDataList.map(b => b['Entity Names']).filter(Boolean))];
+    const sameEntity = entities.length === 1;
+    const entityName = sameEntity ? entities[0] : null;
+    console.log(`Entities detected: [${entities.join(', ')}]`);
+    console.log(`Same entity: ${sameEntity}, Entity name: "${entityName}"`);
+    
+    // Check if this is Jack Daniel's (with flexible matching)
+    const isJackDaniels = entityName && (
+      entityName.includes("Jack Daniel") || 
+      entityName.includes("Jack Daniels") ||
+      entityName.toLowerCase().includes("jackdaniel")
+    );
+    console.log(`Is Jack Daniel's entity: ${isJackDaniels}`);
+    
+    // CRITICAL: For Jack Daniel's multi-brand, check if SAME CLASS first
+    if (sameEntity && isJackDaniels) {
+      console.log('*** JACK DANIELS MULTI-BRAND DETECTED ***');
+      
+      // Extract ABV values and company statements from parsed data
+      const abvValues = [];
+      const companyStatements = [];
+      ttbData.forEach(data => {
+        if (data.parsed) {
+          if (data.parsed.abvNumeric && data.parsed.abvNumeric.length > 0) {
+            abvValues.push(...data.parsed.abvNumeric);
+          }
+          if (data.parsed.company) {
+            companyStatements.push(data.parsed.company);
+          }
+        }
+      });
+      console.log(`Extracted ABV values: [${abvValues.join(', ')}]`);
+      console.log(`Extracted company statements: [${companyStatements.join(' | ')}]`);
+      
+      // STEP 1: Determine class for each brand (Column D or parsed classType)
+      const brandClasses = ttbData.map(data => {
+        // Prefer Column D if available
+        if (data.classFromColumnD) {
+          return data.classFromColumnD;
+        }
+        // Fallback to first class type from parsed statement
+        if (data.parsed && data.parsed.classType) {
+          // Extract first class type (before first comma or "and")
+          const firstClass = data.parsed.classType.split(/,|\s+and\s+/)[0].trim();
+          return firstClass;
+        }
+        return null;
+      }).filter(c => c);
+      
+      console.log(`Determined classes for all brands:`, brandClasses);
+      console.log(`  Brand classes:`, ttbData.map(d => `"${d.brandName}": "${d.classFromColumnD || (d.parsed?.classType?.split(/,|\s+and\s+/)[0].trim()) || 'N/A'}"`));
+      
+      const allSameClass = brandClasses.length === ttbData.length && 
+                          brandClasses.every(c => c === brandClasses[0]);
+      
+      if (allSameClass && abvValues.length > 0 && companyStatements.length > 0) {
+        console.log(`✓ ALL SAME CLASS: "${brandClasses[0]}" - CONSTRUCTING from Column E statements`);
+        
+        // Extract class types from each parsed statement (before ABV)
+        const allClassTypes = [];
+        ttbData.forEach(data => {
+          if (data.parsed && data.parsed.classType) {
+            const classStr = data.parsed.classType;
+            console.log(`  "${data.brandName}" classType: "${classStr}"`);
+            
+            // Split by commas and "and" to get individual class types
+            const types = classStr.split(/,\s*(?:and\s+)?|\s+and\s+/)
+              .map(t => t.trim())
+              .filter(t => t.length > 0);
+            
+            types.forEach(type => {
+              if (!allClassTypes.includes(type)) {
+                allClassTypes.push(type);
+              }
+            });
+          }
+        });
+        
+        console.log(`Unique class types across all brands:`, allClassTypes);
+        
+        // Combine classes with proper grammar
+        let combinedClasses;
+        if (allClassTypes.length === 1) {
+          combinedClasses = allClassTypes[0];
+        } else if (allClassTypes.length === 2) {
+          combinedClasses = allClassTypes.join(' and ');
+        } else {
+          const last = allClassTypes[allClassTypes.length - 1];
+          const rest = allClassTypes.slice(0, -1);
+          combinedClasses = rest.join(', ') + ', and ' + last;
+        }
+        
+        // Get ABV range
+        const abvMin = Math.min(...abvValues);
+        const abvMax = Math.max(...abvValues);
+        const proofMin = Math.round(abvMin * 2);
+        const proofMax = Math.round(abvMax * 2);
+        
+        let abvPart;
+        if (abvMin === abvMax) {
+          abvPart = `${abvMin}% Alc. by Vol. (${proofMin} proof.)`;
+        } else {
+          abvPart = `${abvMin}% - ${abvMax}% Alc. by Vol. (${proofMin} - ${proofMax} proof.)`;
+        }
+        
+        // Use company from first brand (standardize to uppercase JACK DANIEL)
+        let company = companyStatements[0];
+        company = company.replace(/the Jack Daniel Distillery/i, 'JACK DANIEL DISTILLERY');
+        company = company.replace(/Jack Daniel Distillery/i, 'JACK DANIEL DISTILLERY');
+        
+        const constructedStatement = `${combinedClasses}, ${abvPart} ${company}`;
+        console.log(`✓ CONSTRUCTED SAME-CLASS TTB: "${constructedStatement}"`);
+        console.log(`=== TTB SECTION BUILD END ===\n`);
+        return constructedStatement;
+      }
+      
+      // STEP 2: If DIFFERENT classes, look for portfolio column
+      console.log('✗ DIFFERENT classes detected - looking for portfolio column...');
+      let portfolioStatement = null;
+      for (const data of ttbData) {
+        if (data.ttbRow) {
+          console.log(`Checking TTB row for: "${data.brandName}"`);
+          
+          portfolioStatement = data.ttbRow['+1 whitin JD Portfolio'] || 
+                              data.ttbRow['+1 within JD Portfolio'] ||
+                              data.ttbRow['+1 Within JD Portfolio'] ||
+                              data.ttbRow['+ 1 within JD Portfolio'] ||
+                              data.ttbRow['+1 JD Portfolio'] ||
+                              data.ttbRow['JD Portfolio'] ||
+                              data.ttbRow['Portfolio'];
+          
+          if (portfolioStatement) {
+            console.log('*** FOUND PORTFOLIO COLUMN! ***');
+            console.log(`Portfolio statement: ${portfolioStatement}`);
+            console.log(`=== TTB SECTION BUILD END ===\n`);
+            return portfolioStatement;
+          }
+        }
+      }
+      
+      console.error('*** NO PORTFOLIO COLUMN FOUND ***');
+    }
     
     // Extract class types from Column D
-    const classTypes = ttbData.map(d => d.classType).filter(Boolean);
-    const uniqueClassTypes = [...new Set(classTypes)];
+    const classTypesFromColumnD = ttbData
+      .map(d => d.classFromColumnD)
+      .filter(Boolean);
     
-    console.log(`Class types from Column D: [${classTypes.join(', ')}]`);
-    console.log(`Unique class types: [${uniqueClassTypes.join(', ')}]`);
+    const uniqueClassesColumnD = [...new Set(classTypesFromColumnD)];
     
-    // SCENARIO 2: Multiple Brands - Same Class (CHECK FIRST - before portfolio)
-    if (uniqueClassTypes.length === 1 && classTypes.length === ttbData.length && uniqueClassTypes[0]) {
-      console.log('SCENARIO 2: Multiple brands, same class - Constructing Class + ABV range + Company');
+    console.log(`Column D classes: [${classTypesFromColumnD.join(', ')}]`);
+    console.log(`Unique classes: [${uniqueClassesColumnD.join(', ')}]`);
+    
+    // If missing Column D data, fallback
+    if (classTypesFromColumnD.length !== ttbData.length) {
+      console.warn(`Not all brands have Column D data (${classTypesFromColumnD.length} of ${ttbData.length})`);
+      console.log('Brands with Column D:', ttbData.filter(d => d.classFromColumnD).map(d => d.brandName));
+      console.log('Brands WITHOUT Column D:', ttbData.filter(d => !d.classFromColumnD).map(d => d.brandName));
+      console.log(`Fallback: Using first brand statement: "${ttbData[0].statement}"`);
+      console.log(`=== TTB SECTION BUILD END ===\n`);
+      return ttbData[0].statement;
+    }
+    
+    // SCENARIO 2: All same class (for non-JD or JD without portfolio column)
+    if (uniqueClassesColumnD.length === 1) {
+      console.log('SCENARIO 2: All same class - Constructing Class + ABV range + Company');
       
-      const classType = uniqueClassTypes[0];
+      const classType = uniqueClassesColumnD[0];
       
+      // Collect ABV and proof values
       const allAbvValues = [];
+      const allProofValues = [];
+      
       ttbData.forEach(d => {
-        if (d.parsed.abvNumeric && d.parsed.abvNumeric.length > 0) {
+        if (d.parsed && d.parsed.abvNumeric && d.parsed.abvNumeric.length > 0) {
           allAbvValues.push(...d.parsed.abvNumeric);
+        }
+        
+        if (d.statement) {
+          const proofMatch = d.statement.match(/\((\d+)\s*-?\s*(\d+)?\s*proof/i);
+          if (proofMatch) {
+            allProofValues.push(parseInt(proofMatch[1]));
+            if (proofMatch[2]) allProofValues.push(parseInt(proofMatch[2]));
+          }
         }
       });
       
-      console.log(`All ABV values collected: ${JSON.stringify(allAbvValues)}`);
-      
+      // Construct ABV range
       let abvRange = '';
       if (allAbvValues.length > 0) {
         const minABV = Math.min(...allAbvValues);
         const maxABV = Math.max(...allAbvValues);
         
-        console.log(`ABV range: ${minABV} - ${maxABV}`);
-        
         if (minABV === maxABV) {
           abvRange = `${minABV}% Alc. by Vol.`;
         } else {
-          abvRange = `${minABV}-${maxABV}% Alc. by Vol.`;
+          abvRange = `${minABV}% - ${maxABV}% Alc. by Vol.`;
         }
-      } else {
-        console.warn('No ABV values found for same-class brands');
-        abvRange = '';
+        
+        // Add proof
+        if (allProofValues.length > 0) {
+          const minProof = Math.min(...allProofValues);
+          const maxProof = Math.max(...allProofValues);
+          if (minProof === maxProof) {
+            abvRange += ` (${minProof} proof.)`;
+          } else {
+            abvRange += ` (${minProof} - ${maxProof} proof.)`;
+          }
+        }
       }
       
-      const company = ttbData[0].parsed.company;
+      const company = ttbData[0].parsed ? ttbData[0].parsed.company : '';
       
       let constructedStatement;
-      if (abvRange) {
-        // Check first statement to see if it has comma after class type
-        const originalStatement = ttbData[0].statement;
-        const classTypeEscaped = classType.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-        const hasCommaAfterClass = originalStatement && originalStatement.match(new RegExp(`${classTypeEscaped}\\s*,`));
-        
-        console.log(`Format check: hasCommaAfterClass=${!!hasCommaAfterClass}, original="${originalStatement?.substring(0, 80)}"`);
-        
-        // Most JD statements use comma, so default to comma format
-        if (hasCommaAfterClass || !originalStatement) {
-          constructedStatement = `${classType}, ${abvRange}, ${company}`;
-        } else {
-          constructedStatement = `${classType} ${abvRange} ${company}`;
-        }
-      } else {
+      if (abvRange && company) {
+        constructedStatement = `${classType}, ${abvRange} ${company}`;
+      } else if (company) {
         constructedStatement = `${classType}, ${company}`;
+      } else {
+        constructedStatement = ttbData[0].statement;
       }
       
-      console.log(`Constructed TTB statement: ${constructedStatement}`);
+      console.log(`Constructed: ${constructedStatement}`);
       console.log(`=== TTB SECTION BUILD END ===\n`);
       return constructedStatement;
     }
     
-    // Now check for portfolio/entity scenarios (after same-class check)
-    const entities = [...new Set(brandDataList.map(b => b['Entity Names']).filter(Boolean))];
-    console.log(`Unique entities: ${entities.join(', ')}`);
-    
-    const firstBrandTTBRow = ttbData[0].ttbRow;
-    
-    if (firstBrandTTBRow) {
-      // SCENARIO 4: Same Entity/Portfolio (different classes within same portfolio)
-      if (entities.length === 1) {
-        const entity = entities[0];
-        console.log(`All brands have same entity: ${entity}`);
-        
+    // SCENARIO 3: Different classes, same entity
+    if (uniqueClassesColumnD.length > 1 && sameEntity) {
+      console.log('SCENARIO 3: Different classes, same entity - Using portfolio column');
+      
+      const firstBrandTTBRow = ttbData[0].ttbRow;
+      if (firstBrandTTBRow) {
         const portfolioStatement = firstBrandTTBRow['+1 whitin JD Portfolio'] || 
                                    firstBrandTTBRow['+1 within JD Portfolio'];
         
         if (portfolioStatement) {
-          console.log(`SCENARIO 4: Same entity/portfolio (different classes) - Using portfolio TTB from Excel`);
-          console.log(`Portfolio statement: ${portfolioStatement}`);
+          console.log(`Using portfolio: ${portfolioStatement}`);
           console.log(`=== TTB SECTION BUILD END ===\n`);
           return portfolioStatement;
         }
       }
       
-      // SCENARIO 3: Multiple Brands - Different Classes (different entities)
-      const differentBrandsStatement = firstBrandTTBRow['+1 of different brands'];
+      console.warn('No portfolio column, using first statement');
+      console.log(`=== TTB SECTION BUILD END ===\n`);
+      return ttbData[0].statement;
+    }
+    
+    // SCENARIO 4: Different entities
+    if (!sameEntity) {
+      console.log('SCENARIO 4: Different entities - Using different brands column');
       
-      if (differentBrandsStatement) {
-        console.log('SCENARIO 3: Multiple brands, different classes/entities - Using Excel different brands column');
-        console.log(`Different brands statement: ${differentBrandsStatement}`);
-        console.log(`=== TTB SECTION BUILD END ===\n`);
-        return differentBrandsStatement;
+      const firstBrandTTBRow = ttbData[0].ttbRow;
+      if (firstBrandTTBRow) {
+        const differentBrandsStatement = firstBrandTTBRow['+1 of different brands'];
+        
+        if (differentBrandsStatement) {
+          console.log(`Using different brands: ${differentBrandsStatement}`);
+          console.log(`=== TTB SECTION BUILD END ===\n`);
+          return differentBrandsStatement;
+        }
       }
     }
     
-    // FALLBACK: Company only
-    console.log('FALLBACK: Using parsed company from first brand');
-    const parsed = ttbData[0].parsed;
-    const result = parsed ? parsed.company : '';
-    console.log(`Fallback result: ${result}`);
+    // FALLBACK
+    console.log('FALLBACK: Using first statement');
     console.log(`=== TTB SECTION BUILD END ===\n`);
-    return result;
+    return ttbData[0].statement;
   }
 
   detectPortfolio(brandDataList) {
@@ -856,7 +1130,23 @@ class CopyGenerator {
     
     console.log(`Building trademark section for ${brandDataList.length} brand(s), Language: ${language}, Asset Type: ${assetType}`);
     
-    const singularOrPlural = brandDataList.length === 1 ? 1 : '1+';
+    // FIX 3: Check if all brands are expressions of the same base brand
+    const baseBrands = [...new Set(brandDataList.map(b => b['Brand Names']).filter(Boolean))];
+    const isMultipleSameBrand = brandDataList.length > 1 && baseBrands.length === 1;
+    
+    if (isMultipleSameBrand) {
+      console.log(`FIX 3: Multiple expressions of same brand detected - "${baseBrands[0]}"`);
+    }
+    
+    // Determine singular vs plural
+    let singularOrPlural;
+    if (isMultipleSameBrand) {
+      // FIX 3: Multiple expressions of same brand should use singular form
+      singularOrPlural = 1;
+      console.log(`Using singular form (1) for multiple expressions of same brand`);
+    } else {
+      singularOrPlural = brandDataList.length === 1 ? 1 : '1+';
+    }
     
     const tmLangData = this.trademarkLanguage.find(tl => 
       tl['Language'] === language && tl['Singular vs Plural'] === singularOrPlural
@@ -869,6 +1159,7 @@ class CopyGenerator {
     
     console.log(`Using trademark language: ${language} (${singularOrPlural})`);
     
+    // FIX 2: Only apply portfolio prefix logic for known Jack Daniel's/Old Forester/Woodford portfolios
     let usePortfolioForSingle = false;
     if (brandDataList.length === 1) {
       const brandData = brandDataList[0];
@@ -881,9 +1172,12 @@ class CopyGenerator {
         "Woodford Reserve"
       ].includes(entityName);
       
-      if (isKnownPortfolio && !brandName.includes(entityName)) {
+      // FIX 2: Only use portfolio prefix if entity is a known portfolio AND brand name doesn't already contain entity
+      if (isKnownPortfolio && brandName && !brandName.includes(entityName)) {
         usePortfolioForSingle = true;
         console.log(`Single brand will use portfolio prefix, switching to plural form`);
+      } else {
+        console.log(`FIX 2: Single brand "${brandName}" with entity "${entityName}" will NOT use portfolio prefix`);
       }
     }
     
@@ -916,10 +1210,25 @@ class CopyGenerator {
     
     let trademarkText = '';
     
-    if (brandDataList.length === 1) {
-      const brandData = brandDataList[0];
-      let brandName = brandData['Brand Names'] || brandData['Display Names'];
-      const entityName = brandData['Entity Names'] || '';
+    // FIX 3: For multiple expressions of same brand, treat as singular with just base brand name
+    if (brandDataList.length === 1 || isMultipleSameBrand) {
+      let brandName;
+      let entityName;
+      let thirdParty;
+      
+      if (isMultipleSameBrand) {
+        // FIX 3: Use only the base brand name
+        brandName = baseBrands[0];
+        entityName = brandDataList[0]['Entity Names'] || '';
+        thirdParty = brandDataList[0]['Third Party'] || '';
+        console.log(`FIX 3: Using singular form with base brand only: "${brandName}"`);
+      } else {
+        const brandData = brandDataList[0];
+        brandName = brandData['Brand Names'] || brandData['Display Names'];
+        entityName = brandData['Entity Names'] || '';
+        thirdParty = brandData['Third Party'];
+      }
+      
       const preBrand = this.safeGetValue(effectiveTmLangData['Pre-Brand'], 'Pre-Brand');
       
       if (usePortfolioForSingle) {
@@ -937,7 +1246,6 @@ class CopyGenerator {
       trademarkText = trademarkText.replace(/<<Year>>/g, currentYear.toString());
       trademarkText = trademarkText.replace(/<<Entity>>/g, entityName);
       
-      const thirdParty = brandData['Third Party'];
       const reserveLanguage = this.safeGetValue(
         effectiveTmLangData['Reserve Language '] || effectiveTmLangData['Reserve Language'], 
         'Reserve Language'
@@ -1092,15 +1400,46 @@ class CopyGenerator {
       
       if (this.requiresTTB(countryCode) && this.usResponsibilityMessage && this.usResponsibilityMessage.length > 0) {
         if (brandDataList.length === 1) {
+          // Single brand - use US RMD column
           const brandName = brandDataList[0].expressionName || brandDataList[0]['Brand Names'] || brandDataList[0]['Display Names'];
           const usRMD = this.getUSResponsibilityMessage(brandName);
           if (usRMD) {
             respLang = usRMD;
-            console.log(`Using US-specific Responsibility Language: ${usRMD}`);
+            console.log(`Using US-specific Responsibility Language (single brand): ${usRMD}`);
           }
         } else {
-          respLang = 'Please Drink Responsibly.';
-          console.log(`Using generic US Responsibility Language for multiple brands`);
+          // Multi-brand - check for RDM US X Brand column
+          console.log('Multi-brand selection - checking for RDM US X Brand');
+          
+          // Get first brand to look up multi-brand RDM
+          const firstBrandName = brandDataList[0]['Brand Names'] || brandDataList[0]['Display Names'];
+          const usRMDRow = this.usResponsibilityMessage.find(row => {
+            const rowBrandName = row['Brand Name'];
+            return rowBrandName && (
+              rowBrandName === firstBrandName ||
+              rowBrandName.toLowerCase().includes(firstBrandName.toLowerCase()) ||
+              firstBrandName.toLowerCase().includes(rowBrandName.toLowerCase())
+            );
+          });
+          
+          if (usRMDRow) {
+            // Check for multi-brand RDM column
+            const multiBrandRDM = usRMDRow['RDM US X Brand'] || 
+                                  usRMDRow['RDM US XBrand'] ||
+                                  usRMDRow['US RDM X Brand'];
+            
+            if (multiBrandRDM) {
+              respLang = multiBrandRDM;
+              console.log(`Using multi-brand RDM from RDM US X Brand column: ${multiBrandRDM}`);
+            } else {
+              // Fallback to generic
+              respLang = 'Please Drink Responsibly.';
+              console.log(`No multi-brand RDM found, using generic`);
+            }
+          } else {
+            respLang = 'Please Drink Responsibly.';
+            console.log(`No US RMD row found, using generic`);
+          }
         }
       }
       
@@ -1330,24 +1669,29 @@ class CopyGenerator {
     console.log(`Asset Type: ${assetType}`);
     console.log(`Number of brands: ${brandDataList.length}`);
     
-    const brandsNeedingForwardNotice = brandDataList.filter(b => 
-      b['Forward Notice Type'] && b['Forward Notice Type'] !== 'NA' && b['Forward Notice Type'] !== 'N/A'
+    // Look up Forward Notice Type based on Asset Type from Trademark Config
+    console.log(`Looking up Forward Notice Type for Asset Type: "${assetType}"`);
+    
+    const assetTypeConfig = this.trademarkData.find(row => 
+      row['Asset Type'] === assetType
     );
     
-    console.log(`Brands needing Forward Notice: ${brandsNeedingForwardNotice.length}`);
-    brandsNeedingForwardNotice.forEach(b => {
-      console.log(`  - ${b['Display Names']}: ${b['Forward Notice Type']}`);
-    });
-    
-    if (brandsNeedingForwardNotice.length === 0) {
-      console.log('No brands require Forward Notice');
+    if (!assetTypeConfig) {
+      console.warn(`No Forward Notice configuration found for Asset Type: "${assetType}"`);
       console.log(`=== Forward Notice Logic End ===`);
       return '';
     }
     
-    const forwardNoticeType = brandsNeedingForwardNotice[0]['Forward Notice Type'];
+    const forwardNoticeType = assetTypeConfig['Forward Notice Type'];
     
-    console.log(`Forward Notice Type to use: ${forwardNoticeType}`);
+    console.log(`Found Forward Notice Type for this Asset Type: "${forwardNoticeType}"`);
+    
+    // Check if Forward Notice is needed
+    if (!forwardNoticeType || forwardNoticeType === 'NA' || forwardNoticeType === 'N/A' || forwardNoticeType === 'None') {
+      console.log(`Forward Notice Type is "${forwardNoticeType}" - no Forward Notice needed`);
+      console.log(`=== Forward Notice Logic End ===`);
+      return '';
+    }
     
     let forwardNoticeText = '';
     

@@ -577,17 +577,3 @@ This project is licensed under the ISC License - see the [LICENSE](LICENSE) file
 **Marketing Compliance Team**  
 Brown-Forman Corporation
 
-**Developer**  
-Abhradip Choudhuri
-
-## Acknowledgments
-
-- Brown-Forman Corporation
-- Marketing Compliance Team
-- Electron community
-- React team
-
-## Support
-
-For issues, questions, or feature requests:
-- GitHub Issues: [Report an issue](https://github.com/abhradipchoudhuri/digital-compliance-tool-2/issues)

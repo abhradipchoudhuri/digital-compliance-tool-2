@@ -1,474 +1,593 @@
-# Digital Compliance Legal Copy Generator
+# Digital Compliance Tool - Legal Copy Generator
 
-> A modern Electron desktop application for generating compliant legal copy for digital marketing assets, replacing the legacy Google Sites implementation with a professional, offline-capable solution.
+An Electron desktop application for generating compliant legal copy for digital and traditional marketing materials across Brown-Forman's global brand portfolio.
 
-## 📋 Table of Contents
+[![Electron](https://img.shields.io/badge/Electron-37.3.1-47848F?style=flat&logo=electron)](https://www.electronjs.org/)
+[![React](https://img.shields.io/badge/React-19.1.1-61DAFB?style=flat&logo=react)](https://reactjs.org/)
+[![License](https://img.shields.io/badge/License-ISC-blue.svg)](LICENSE)
+
+## Table of Contents
 
 - [Overview](#overview)
-- [Technology Stack](#technology-stack)
-- [Architecture](#architecture)
+- [Features](#features)
+- [Tech Stack](#tech-stack)
 - [Project Structure](#project-structure)
-- [Development Setup](#development-setup)
-- [Build Process](#build-process)
-- [Data Sources](#data-sources)
-- [Deployment](#deployment)
-- [IT Team Handover](#it-team-handover)
-- [Future Roadmap](#future-roadmap)
+- [Getting Started](#getting-started)
+- [Usage Guide](#usage-guide)
+- [Architecture](#architecture)
+- [Excel Data Structure](#excel-data-structure)
+- [Key Features in Detail](#key-features-in-detail)
+- [Development](#development)
+- [Troubleshooting](#troubleshooting)
+- [Contributing](#contributing)
+- [License](#license)
 
-## 🎯 Overview
+## Overview
 
-The Digital Compliance Tool is a desktop application that generates legally compliant copy for Brown-Forman's digital marketing assets across multiple countries, languages, and brand portfolios. It processes complex trademark, regulatory, and compliance requirements through an Excel-driven template engine.
+## Overview
 
-### Key Features
+The Digital Compliance Tool is an Electron desktop application built for Brown-Forman Corporation's Marketing Compliance Team. It replaces an Excel-based workflow and Google Sites implementation for generating legally compliant marketing copy.
 
-- **Multi-Language Support**: 30+ languages with country-specific compliance rules
-- **Brand Portfolio Management**: Individual brands and multi-brand portfolios (Bar-Fabric, etc.)
-- **Template Engine**: Sophisticated placeholder system for dynamic content generation
-- **Excel Integration**: Direct processing of trademark data from Excel sheets
-- **History Management**: Track, search, and export generation history
-- **Offline Operation**: No internet dependency for core functionality
-- **Professional UI**: Modern interface matching existing design standards
+### Background
 
-### Business Value
+The previous system relied on manual Excel lookups across multiple sheets, a Google Sites interface, and manual copy-paste workflows. This resulted in errors, limited offline capability, and maintenance difficulties.
 
-- **Compliance Assurance**: Eliminates manual errors in legal copy generation
-- **Efficiency**: Reduces copy generation time from minutes to seconds
-- **Scalability**: Supports expanding brand portfolio and international markets
-- **Audit Trail**: Complete history of generated copy for compliance tracking
-- **Future-Ready**: Architecture supports API integration with DAM systems
+### Current Implementation
 
-## 🛠️ Technology Stack
+This application provides:
+- Automated legal copy generation for 40+ brands across 179 countries
+- Support for 27 different asset types
+- Complex compliance rule processing (TTB statements, trademarks, responsibility messages)
+- Offline operation with local Excel data storage
+- Real-time generation with proper formatting
 
-### Core Technologies
+## Features
 
-| Technology | Version | Purpose |
-|-----------|---------|---------|
-| **Electron** | 28.x | Desktop application framework |
-| **React** | 18.x | Frontend UI library |
-| **Node.js** | 18.x | JavaScript runtime |
-| **Webpack** | 5.x | Module bundler and build tool |
+## Features
 
-### UI & Styling
+### Core Functionality
 
-| Technology | Purpose |
-|-----------|---------|
-| **Tailwind CSS** | Utility-first CSS framework |
-| **Lucide React** | Icon library |
-| **PostCSS** | CSS processing |
+- Global brand support: Generate compliant copy for 40+ brands across 179 countries
+- Asset type coverage: Support for 27 different asset types including email footers, social media, web footers, GIFs, and videos
+- Real-time generation: Instant copy generation with proper legal formatting
+- Clipboard integration: One-click copy with hyperlinks preserved
+- Multi-brand support: Handle single brands, multi-brand portfolios, and FOB (Free On Board) brands
+- Theme support: Light and dark mode with localStorage persistence
+- Modern UI: React-based interface with Tailwind CSS styling
+
+### Compliance Features
+
+#### TTB (Tax and Trade Bureau) Statements
+- Automatic TTB statement generation for US and Puerto Rico
+- Version selection (Full, Tightened, Limited Character)
+- Class-based statement construction for same-class multi-brand selections
+- Special handling for Jack Daniel's portfolio (Tennessee Whiskey, Rye, etc.)
+
+#### Trademark Generation
+- Language-specific trademark formatting
+- Singular vs. plural brand handling
+- Entity and portfolio trademark logic
+- Forward Notice support
+- Third-party trademark attribution (e.g., Coca-Cola partnerships)
+
+#### Responsibility Messages
+- Country and brand-specific drinking responsibility messages
+- US/Puerto Rico special handling with entity-level messages
+- Language-dependent variables and formatting
+
+### Special Brand Handling
+
+- Jack Daniel's Portfolio: Intelligent handling of 15+ expressions with class-type detection
+- Jack Daniel's & Coca-Cola: Special trademark language with Third Party Rights
+- FOB Brands: Isolation logic preventing mixing with regular brands
+- Multi-Brand Selection: Validation rules for compatible brand combinations
+
+### User Experience Features
+
+- Smart brand filtering with alphabetical sorting and search functionality
+- Selected brand chips with visual display and one-click removal
+- Real-time error validation with contextual error messages
+- Asset type instructions displayed contextually for specific asset types
+- Clear all selection functionality for quick reset
+- Console log export (Ctrl+Shift+L) for debugging purposes
+
+## Tech Stack
+
+### Frontend
+- **React 19.1.1** - Modern UI component library
+- **Tailwind CSS 4.1.12** - Utility-first CSS framework
+- **Lucide React 0.542.0** - Beautiful icon library
+
+### Desktop Framework
+- **Electron 37.3.1** - Cross-platform desktop application framework
+- **Webpack 5** - Module bundler with dev server
+- **Babel 7** - JavaScript transpiler
 
 ### Data Processing
+- **ExcelJS 4.4.0** - Secure Excel file parsing and manipulation
+- **PapaParse 5.5.3** - CSV parsing library
 
-| Technology | Purpose |
-|-----------|---------|
-| **SheetJS (XLSX)** | Excel file parsing and processing |
-| **PapaParse** | CSV parsing (future use) |
+### Development Tools
+- **ESLint 9** - Code quality and style enforcement
+- **Prettier 3** - Code formatting
+- **Concurrently** - Run multiple npm commands simultaneously
+- **Wait-on** - Wait for resources to be available
 
-### Build & Development
-
-| Technology | Purpose |
-|-----------|---------|
-| **Babel** | JavaScript transpilation |
-| **ESLint** | Code linting |
-| **Prettier** | Code formatting |
-| **Electron Builder** | Application packaging |
-
-### Testing & Quality
-
-| Technology | Purpose |
-|-----------|---------|
-| **Custom Scripts** | Application testing |
-| **GitHub Actions** | CI/CD pipeline |
-
-## 🏗️ Architecture
-
-### Application Architecture
-
-```mermaid
-graph TB
-    A[Main Process] --> B[Preload Script]
-    B --> C[Renderer Process]
-    C --> D[React Components]
-    C --> E[Services Layer]
-    E --> F[Excel Service]
-    E --> G[Template Service]
-    E --> H[Validation Service]
-    F --> I[Excel Data Source]
-    G --> J[Generated Copy]
-```
-
-### Data Flow
-
-```mermaid
-sequenceDiagram
-    participant U as User
-    participant UI as React UI
-    participant ES as Excel Service
-    participant TS as Template Service
-    participant E as Excel File
-    
-    U->>UI: Select Asset Type, Country, Brands
-    UI->>ES: Load Excel Data
-    ES->>E: Parse 7 Sheets
-    E-->>ES: Return Structured Data
-    ES-->>UI: Brands, Countries, Asset Types
-    U->>UI: Click Generate
-    UI->>TS: Generate Copy Request
-    TS->>ES: Get Template & Language Data
-    ES-->>TS: Template Structure & Variables
-    TS->>TS: Process Placeholders
-    TS-->>UI: Generated Copy (HTML & Plain Text)
-    UI-->>U: Display Results
-```
-
-### Security Model
-
-- **Process Isolation**: Main, renderer, and preload processes isolated
-- **Context Isolation**: Secure IPC communication bridge
-- **No Node Integration**: Renderer process sandboxed
-- **Input Validation**: All user inputs validated and sanitized
-- **File System Access**: Restricted to designated data directories
-
-## 📁 Project Structure
+## Project Structure
 
 ```
-digital-compliance-tool/
-├── 📄 README.md                          # This file
-├── 📄 package.json                       # Project configuration & dependencies
-├── 📄 .gitignore                         # Git ignore rules
-├── 📄 .eslintrc.js                       # ESLint configuration
-├── 📄 .prettierrc                        # Prettier configuration
-├── 📄 babel.config.js                    # Babel transpilation config
-├── 📄 tailwind.config.js                 # Tailwind CSS configuration
-├── 📄 postcss.config.js                  # PostCSS configuration
-│
-├── 📁 src/                               # Source code
-│   ├── 📁 main/                          # Electron main process
-│   │   ├── 📄 main.js                    # Main process entry point
-│   │   ├── 📄 menu.js                    # Application menu setup
-│   │   ├── 📄 security.js                # Security policies & CSP
-│   │   └── 📄 updater.js                 # Auto-updater configuration
+digital-compliance-tool-2/
+├── src/
+│   ├── main/              # Electron main process
+│   │   ├── main.js        # Application entry point
+│   │   ├── menu.js        # Application menu
+│   │   └── preload.js     # Preload script
 │   │
-│   ├── 📁 preload/                       # Secure IPC bridge
-│   │   └── 📄 preload.js                 # Context bridge API exposure
-│   │
-│   └── 📁 renderer/                      # React frontend application
-│       ├── 📄 index.html                 # HTML template
-│       ├── 📄 index.js                   # React application entry point
-│       ├── 📄 App.jsx                    # Main React component
+│   └── renderer/          # React application
+│       ├── App.jsx        # Main app component
+│       ├── index.js       # React entry point
+│       ├── index.html     # HTML template
 │       │
-│       ├── 📁 components/                # React UI components
-│       │   ├── 📁 common/               # Reusable components
-│       │   │   ├── 📄 Header.jsx         # Application header
-│       │   │   ├── 📄 Footer.jsx         # Application footer
-│       │   │   ├── 📄 LoadingSpinner.jsx # Loading indicator
-│       │   │   └── 📄 ErrorBoundary.jsx  # Error handling wrapper
-│       │   │
-│       │   ├── 📁 forms/                # Form input components
-│       │   │   ├── 📄 AssetTypeSelector.jsx    # Asset type dropdown
-│       │   │   ├── 📄 CountrySelector.jsx      # Country search/select
-│       │   │   ├── 📄 BrandSelector.jsx        # Brand grid selection
-│       │   │   └── 📄 GenerateButton.jsx       # Copy generation trigger
-│       │   │
-│       │   └── 📁 output/               # Copy display components
-│       │       ├── 📄 GeneratedCopy.jsx        # Copy output display
-│       │       ├── 📄 CopyButton.jsx           # Clipboard functionality
-│       │       └── 📄 HistoryPanel.jsx         # Generation history
+│       ├── services/      # Business logic
+│       │   ├── excelService.js      # Excel data loading & parsing
+│       │   ├── templateService.js   # Template processing
+│       │   └── copyGenerator.js     # Copy generation engine
 │       │
-│       ├── 📁 hooks/                    # React custom hooks
-│       │   ├── 📄 useDataLoader.js       # Excel data loading hook
-│       │   ├── 📄 useTemplateEngine.js   # Copy generation hook
-│       │   └── 📄 useClipboard.js        # Clipboard operations hook
-│       │
-│       ├── 📁 services/                 # Business logic layer
-│       │   ├── 📄 excelService.js        # Excel parsing & data management
-│       │   ├── 📄 templateService.js     # Copy generation engine
-│       │   ├── 📄 validationService.js   # Input validation
-│       │   └── 📄 apiService.js          # Future API integration layer
-│       │
-│       ├── 📁 utils/                    # Utility functions
-│       │   ├── 📄 constants.js           # Application constants
-│       │   ├── 📄 helpers.js             # Helper functions
-│       │   └── 📄 logger.js              # Logging utilities
-│       │
-│       └── 📁 styles/                   # CSS styling
-│           ├── 📄 globals.css            # Global styles (Tailwind)
-│           └── 📄 components.css         # Component-specific styles
+│       └── styles/        # CSS files
+│           └── globals.css
 │
-├── 📁 config/                           # Build configuration
-│   ├── 📄 webpack.config.js              # Webpack build configuration
-│   ├── 📄 forge.config.js                # Electron Forge packaging
-│   ├── 📄 security.config.js             # Security policies
-│   └── 📁 environments/                 # Environment-specific configs
-│       ├── 📄 development.json           # Development environment
-│       ├── 📄 production.json            # Production environment
-│       └── 📄 intranet.json              # Future intranet deployment
+├── data/                  # Excel data files
+│   └── EXTERNAL__Trademark_Tool_Data_LCG_2_0.xlsx
 │
-├── 📁 data/                             # Application data
-│   ├── 📁 templates/                    # Excel data templates
-│   │   ├── 📄 trademark-data.xlsx        # Main trademark data source
-│   │   └── 📄 data-schema.json           # Data validation schema
-│   └── 📁 samples/                      # Sample/demo data
-│       └── 📄 sample-data.xlsx           # Non-sensitive test data
+├── config/               # Configuration files
+│   └── webpack.config.js
 │
-├── 📁 assets/                           # Static assets
-│   ├── 📁 icons/                        # Application icons
-│   │   ├── 📄 icon.png                   # PNG icon (512x512)
-│   │   ├── 📄 icon.ico                   # Windows icon
-│   │   └── 📄 icon.icns                  # macOS icon
-│   └── 📁 images/                       # Other images
-│       └── 📄 logo.png                   # Application logo
+├── assets/               # Application assets
+│   └── icons/
 │
-├── 📁 scripts/                          # Build & utility scripts
-│   ├── 📄 build.js                       # Production build script
-│   ├── 📄 package.js                     # Application packaging
-│   ├── 📄 setup-dev.js                   # Development environment setup
-│   ├── 📄 copy-resources.js              # Resource copying utility
-│   └── 📁 migration/                     # Future migration utilities
-│       ├── 📄 excel-to-api.js            # API migration helper
-│       └── 📄 data-cleanup.js            # Data sanitization
+├── docs/                 # Documentation
 │
-├── 📁 docs/                             # Documentation
-│   ├── 📄 01_SETUP.md                    # Project initialization guide
-│   ├── 📄 02_WEBPACK_CONFIG.md           # Build system setup
-│   ├── 📄 03_MAIN_PROCESS.md             # Electron main process
-│   ├── 📄 04_PRELOAD_SCRIPT.md           # IPC bridge setup
-│   ├── 📄 05_EXCEL_SERVICE.md            # Excel data processing
-│   ├── 📄 06_TEMPLATE_ENGINE.md          # Copy generation engine
-│   ├── 📄 07_UI_COMPONENTS.md            # React components
-│   ├── 📄 08_OUTPUT_COMPONENTS.md        # Copy output & history
-│   ├── 📄 09_FINAL_POLISH.md             # Performance & accessibility
-│   ├── 📄 10_BUILD_PACKAGE.md            # Final build & deployment
-│   ├── 📄 API_MIGRATION.md               # Future API integration guide
-│   ├── 📄 DEPLOYMENT.md                  # Deployment instructions
-│   ├── 📄 SECURITY.md                    # Security guidelines
-│   ├── 📄 DEVELOPMENT.md                 # Development setup guide
-│   └── 📄 TROUBLESHOOTING.md             # Common issues & solutions
-│
-├── 📁 tests/                            # Testing files
-│   ├── 📁 unit/                         # Unit tests
-│   ├── 📁 integration/                  # Integration tests
-│   │   └── 📄 data-processing.test.js    # Data processing tests
-│   └── 📁 e2e/                          # End-to-end tests
-│       └── 📄 app.test.js                # Application flow tests
-│
-├── 📁 .github/                          # GitHub configuration
-│   ├── 📁 workflows/                    # CI/CD workflows
-│   │   ├── 📄 build.yml                  # Build automation
-│   │   ├── 📄 code-quality.yml           # Code quality checks
-│   │   └── 📄 security-scan.yml          # Security scanning
-│   ├── 📁 ISSUE_TEMPLATE/               # Issue templates
-│   │   ├── 📄 bug_report.md              # Bug report template
-│   │   ├── 📄 feature_request.md         # Feature request template
-│   │   └── 📄 security_issue.md          # Security issue template
-│   └── 📄 pull_request_template.md       # PR template
-│
-├── 📁 build/                            # Build artifacts (generated)
-├── 📁 dist/                             # Development build output
-├── 📁 dist-electron/                    # Production build output
-└── 📁 node_modules/                     # Dependencies (generated)
+└── package.json          # Dependencies and scripts
 ```
 
-## 🔧 Development Setup
+## Getting Started
 
 ### Prerequisites
 
-- **Node.js**: Version 18.x or higher
-- **npm**: Version 9.x or higher
-- **Git**: For version control
-- **Windows**: For building Windows executables (recommended)
+- **Node.js** 18.x or higher
+- **npm** 9.x or higher
+- **Git**
 
-### Quick Start
+### Installation
 
-1. **Clone & Navigate**
-   ```bash
-   git clone <repository-url>
-   cd digital-compliance-tool
-   ```
+1. **Clone the repository**
+```bash
+git clone https://github.com/abhradipchoudhuri/digital-compliance-tool-2.git
+cd digital-compliance-tool-2
+```
 
-2. **Install Dependencies**
-   ```bash
-   npm install
-   ```
+2. **Install dependencies**
+```bash
+npm install
+```
 
-3. **Prepare Data**
-   ```bash
-   # Copy Excel file to correct location
-   cp "EXTERNAL  Trademark Tool Data 1.xlsx" data/templates/trademark-data.xlsx
-   ```
+3. **Place Excel data file**
+```bash
+# Ensure the Excel file is in the data/ directory:
+data/EXTERNAL__Trademark_Tool_Data_LCG_2_0.xlsx
+```
 
-4. **Start Development**
-   ```bash
-   npm start
-   ```
+4. **Start the application**
+```bash
+npm start
+```
 
-### Development Commands
+The application will:
+- Start webpack dev server on http://localhost:3000
+- Launch Electron window automatically
+- Enable hot-reload for development
 
-| Command | Purpose |
-|---------|---------|
-| `npm start` | Start development server with hot reload |
-| `npm run electron` | Launch Electron app (after webpack build) |
-| `npm run build` | Create production build |
-| `npm test` | Run application tests |
-| `npm run package:win` | Build Windows installer |
-| `npm run package:mac` | Build macOS installer |
-| `npm run package:linux` | Build Linux package |
-| `npm run clean` | Clean build directories |
+## Usage Guide
+
+### Basic Workflow
+
+1. **Select Asset Type**: Choose from 27 asset types (e.g., "Email Footer", "Social Media Post")
+2. **Select Country**: Pick from 179 countries to filter available brands
+3. **Select Brands**: Check one or more brands (subject to validation rules)
+4. **Generate**: Click "Generate Legal Copy" button
+5. **Copy**: Use "Copy to Clipboard" to get formatted text with hyperlinks
+
+### Brand Selection Rules
+
+#### Single Brand
+- Select any single brand
+- Automatically shows entity if different from brand name
+
+#### Multi-Brand (Same Entity)
+- Example: Jack Daniel's Old No.7 + Jack Daniel's Bonded Series
+- Generates combined trademark with entity
+- Same-class brands show class type with ABV range
+
+#### Multi-Brand (Different Entities)
+- Example: Woodford Reserve + Old Forester
+- Shows consolidated Brown-Forman entity
+- Uses plural trademark format
+
+#### Special Cases
+- Multi-Brand: Can only be selected alone (isolation required)
+- FOB Brands: Can only be mixed with other FOB brands
+- Jack Daniel's & Coca-Cola: Uses special Third Party Rights language
+
+### Dark Mode
+
+Toggle between light and dark themes using the moon/sun icon in the top-right corner. Theme preference is persisted to localStorage.
+
+### Keyboard Shortcuts
+
+- `Ctrl+Shift+L`: Copy all console logs to clipboard (development feature)
+
+### Asset Type Instructions
+
+Certain asset types display additional instructions in the output panel. For example, GIF assets include guidance on text sizing and positioning.
+
+## Architecture
+
+### Data Flow
+
+```
+Excel File (7 Sheets)
+    ↓
+excelService.js (Parse & Load)
+    ↓
+App.jsx (User Selections)
+    ↓
+templateService.js (Coordinate Generation)
+    ↓
+copyGenerator.js (Generate Copy)
+    ↓
+Generated Copy (HTML + Plain Text)
+```
+
+### Key Services
+
+#### 1. **excelService.js**
+- Loads and parses Excel file using ExcelJS
+- Processes 7 sheets with different structures
+- Provides data access methods:
+  - `getBrands()` - All brand data
+  - `getCountries()` - Country list
+  - `getAssetTypes()` - Asset type list
+  - `getBrandsForCountry(code)` - Filtered brands
+
+#### 2. **copyGenerator.js** (1,787 lines)
+The core engine that handles:
+
+- **TTB Statement Generation**
+  - `requiresTTB(country)` - Check if country needs TTB
+  - `buildTTBSection()` - Construct TTB statements
+  - Same-class vs different-class detection
+  - ABV range construction
+  - Portfolio statement selection
+
+- **Trademark Generation**
+  - `buildTrademarkSection()` - Generate trademarks
+  - Singular/plural logic
+  - Portfolio prefix handling (Jack Daniel's, Old Forester, Woodford Reserve)
+  - Language-specific formatting
+  - Entity copyright logic
+
+- **US Responsibility Message**
+  - `getUSResponsibilityMessage()` - Get RDM
+  - Entity-level lookup for multi-brand same-entity
+  - Brand-specific messages
+  - Generic fallback
+
+- **Forward Notice**
+  - `getForwardNotice()` - Get forward notice text
+  - Brand-specific requirements
+  - Language-dependent variables
+
+- **Placeholder Replacement**
+  - `buildCopyFromTemplate()` - Replace placeholders
+  - Order-dependent replacement logic
+  - Hyperlink preservation
+
+#### 3. **templateService.js**
+- Coordinates the copy generation workflow
+- Validates inputs
+- Calls copyGenerator methods
+- Returns formatted results
+
+### Excel Data Structure
+
+The application processes a multi-sheet Excel file:
+
+#### Sheet 1: Trademark Config
+- Display Names, Brand Names, Entity Names
+- Asset Type mappings
+- Forward Notice Types
+- TTB Types
+
+#### Sheet 2: Trademark Language
+- Language-specific trademark text
+- Registered Language (singular/plural)
+- Reserve Language
+- **Third Party Rights** (for Coca-Cola)
+
+#### Sheet 3: Trademark Structure
+- Template structures for trademark types
+
+#### Sheet 4: Language Dependent Variables
+- Responsibility Language
+- Forward Notice (Full/Tightened)
+- Email statements
+- Legal document links
+
+#### Sheet 5: Overall Structure
+- Asset type templates with placeholders
+
+#### Sheet 6: CountryLanguage
+- Country abbreviations
+- Language mappings
+
+#### Sheet 7: TTB Statements
+- Brand Name
+- Multi-brand indicator
+- TTB Statement - Full
+- TTB Statement - Tightened
+- TTB Statement - Limited Character
+- **Class & Type** (Column D)
+
+#### Sheet 8: Brand Availability
+- Brand availability by country
+- Entity information
+- Third Party information
+
+#### Sheet 9: US Responsibility Message
+- Brand-specific US RDM
+- Entity-level messages
+
+## Key Features in Detail
+
+### 1. TTB Statement Logic
+
+**US and Puerto Rico Only**
+
+TTB statements are required for alcohol marketing in US and Puerto Rico:
+
+```javascript
+// Single Brand
+"Tennessee Whiskey, 40% Alc. by Vol. (80 proof.)"
+
+// Multi-Brand Same Class
+"Tennessee Whiskey, Tennessee Rye Whiskey, 40% - 50% Alc. by Vol. (80 - 100 proof.)"
+
+// Multi-Brand Different Class
+"©2024 JACK DANIEL DISTILLERY, Lynchburg, TN."
+```
+
+**Special Logic:**
+- Same-class brands: Show class type with ABV range
+- Different-class brands: Show entity information only
+- Jack Daniel's: Detect 15+ expressions with different classes
+
+### 2. Trademark Generation
+
+**Single Brand:**
+```
+Jack Daniel's is a registered trademark. ©2024 Jack Daniel's. All rights reserved.
+```
+
+**Multi-Brand (Same Entity):**
+```
+Jack Daniel's and Jack Daniel's Bonded Series are registered trademarks. ©2024 Jack Daniel's. All rights reserved.
+```
+
+**Multi-Brand (Different Entities):**
+```
+Woodford Reserve and Old Forester are registered trademarks. ©2024 Brown-Forman. All rights reserved.
+```
+
+**Jack Daniel's & Coca-Cola:**
+```
+Jack Daniel's & Coca Cola 5% ALC/VOL (RTD) is a registered trademark. ©2024 Jack Daniel's and The Coca-Cola Company. COCA-COLA is a trademark of the Coca-Cola Company.
+```
+
+### 3. Language Support
+
+The system supports 40+ languages with proper trademark formatting:
+
+- **Spanish**: "es una marca registrada" / "Todos los derechos reservados"
+- **German**: "ist eine eingetragene Marke" / "Alle Rechte vorbehalten"
+- **French**: "est une marque déposée" / "Tous droits réservés"
+- **Chinese**: "为注册商标" / "版权所有"
+- And many more...
+
+**Fallback Logic**: If Third Party Rights text is missing for a language (e.g., Czech, Danish), the system falls back to English (Default).
+
+### 4. Brand Validation
+
+Real-time validation prevents invalid combinations:
+
+```javascript
+// Valid combinations
+Jack Daniel's Old No.7 (single)
+Jack Daniel's Old No.7 + Jack Daniel's Bonded Series (same entity)
+Woodford Reserve + Old Forester (different entities)
+
+// Invalid combinations
+Jack Daniel's Old No.7 + Bar-Fabric (multi-brand) // Multi-brand must be alone
+Jack Daniel's (FOB) + Woodford Reserve // Can't mix FOB with non-FOB
+Jack Daniel's + Jack Daniel's (multi-brand) // Can't mix single with multi-brand
+```
+
+### 5. Fuzzy Brand Name Matching
+
+The system uses fuzzy matching to handle brand name inconsistencies across sheets:
+
+```javascript
+// Excel Inconsistencies
+"Jack Daniel's Old N.7" (Trademark Config)
+"Jack Daniel's Old No.7" (Brand Availability)
+"Old No.7" (TTB Statements)
+
+// System normalizes to:
+"oldno7" for matching
+```
+
+### 6. Console Log Export
+
+**Developer Feature**: Press `Ctrl+Shift+L` to copy all console logs to clipboard for debugging.
+
+Captures:
+- Timestamp
+- Log level (LOG/WARN/ERROR)
+- Message content
+- Structured data (JSON)
+
+## Development
+
+### Available Scripts
+
+```bash
+# Development
+npm start              # Start webpack dev server + Electron
+npm run webpack-dev    # Start webpack dev server only
+npm run electron       # Start Electron only
+
+# Production Build
+npm run webpack-prod   # Build production webpack bundle
+npm run build          # Build for distribution
+npm run pack           # Package without installer
+
+# Code Quality
+npm run lint           # Run ESLint
+npm run format         # Run Prettier
+```
 
 ### Development Workflow
 
-1. **Follow Sequential Setup**: Use markdown files `01_SETUP.md` through `10_BUILD_PACKAGE.md`
-2. **Component Development**: Build UI components in `src/renderer/components/`
-3. **Service Integration**: Implement business logic in `src/renderer/services/`
-4. **Testing**: Validate functionality at each stage
-5. **Build & Package**: Create distributable installer
+1. **Make changes** to files in `src/`
+2. **Webpack hot-reloads** automatically
+3. **Test in Electron** window
+4. **Check console** for any errors
+5. **Commit** with descriptive messages
 
-## 🔨 Build Process
+### Adding New Features
 
-### Development Build
-```bash
-# Webpack development server
-npm run webpack-dev
+#### To Add a New Asset Type:
+1. Update Excel file: `Overall Structure` sheet
+2. Add template with placeholders
+3. System will automatically load it
 
-# Electron in development mode
-npm run electron:dev
+#### To Add a New Country:
+1. Update Excel file: `CountryLanguage` sheet
+2. Update Excel file: `Brand Availability` sheet
+3. System will automatically filter brands
+
+#### To Add a New Brand:
+1. Update Excel file: `Brand Availability` sheet
+2. Update Excel file: `Trademark Config` sheet
+3. Update Excel file: `TTB Statements` sheet (if US/PR)
+4. System will automatically include it
+
+## Troubleshooting
+
+### Common Issues
+
+#### 1. Excel File Not Found
 ```
-
-### Production Build
-```bash
-# Create optimized build
-npm run build
-
-# Package for distribution
-npm run package
-
-# Platform-specific builds
-npm run package:win    # Windows .exe installer
-npm run package:mac    # macOS .dmg installer  
-npm run package:linux  # Linux .deb package
+Error: Cannot find Excel file
 ```
+**Solution**: Ensure `data/EXTERNAL__Trademark_Tool_Data_LCG_2_0.xlsx` exists
 
-### Build Output
+#### 2. Brands Not Loading
+```
+0 brands available
+```
+**Solution**: 
+- Check if country has brands in Brand Availability sheet
+- Verify Excel file loaded successfully (check console)
 
-| File | Description |
-|------|-------------|
-| `dist-electron/Digital Compliance Tool-1.0.0-Setup.exe` | Windows installer |
-| `dist-electron/Digital Compliance Tool-1.0.0.dmg` | macOS installer |
-| `dist-electron/digital-compliance-tool_1.0.0_amd64.deb` | Linux package |
+#### 3. TTB Statement Missing
+```
+TTB statement not found for brand
+```
+**Solution**: 
+- Verify brand exists in TTB Statements sheet
+- Check brand name matches exactly
+- Check Column D (Class & Type) is populated
 
-## 📊 Data Sources
+#### 4. Trademark Shows [object Object]
+```
+[object Object] is a registered trademark
+```
+**Solution**: 
+- Already fixed in copyGenerator.js with `safeGetValue()` wrapper
+- Ensures proper text extraction from Excel cells
 
-### Excel File Structure
+#### 5. Dark Mode Not Persisting
+```
+Dark mode resets on refresh
+```
+**Solution**: 
+- Check localStorage is enabled in Electron
+- Verify no security policies blocking storage
 
-The application processes a single Excel file with 7 interconnected sheets:
+### Debug Mode
 
-| Sheet Name | Purpose | Key Data |
-|-----------|---------|----------|
-| **Trademark Config** | Brand and asset type definitions | Brands, entities, asset types, instructions |
-| **CountryLanguage** | Country-language mappings | Country codes, languages, market specifics |
-| **Trademark Language** | Language-specific trademark text | Registered language, reserve language |
-| **Trademark Structure** | Template structures by type | Full, tightened, limited character formats |
-| **Language Dependent Variables** | Country-specific compliance text | Responsibility language, forward notices |
-| **Overall Structure** | Asset-type template mapping | Template structures for each asset type |
-| **Help Text** | User interface instructions | HTML-formatted help content |
+To see detailed logs:
+1. Open DevTools in Electron (`Ctrl+Shift+I`)
+2. Check Console tab
+3. Look for logs from:
+   - `excelService.js` (data loading)
+   - `copyGenerator.js` (copy generation)
+   - `App.jsx` (user actions)
 
-### Data Processing Flow
+## Contributing
 
-1. **Excel Loading**: File read via Node.js filesystem API
-2. **Sheet Parsing**: Each sheet processed using SheetJS library
-3. **Data Validation**: Structure and content validation
-4. **Memory Storage**: Parsed data cached in service layer
-5. **Template Processing**: Dynamic placeholder replacement
-6. **Output Generation**: HTML and plain text copy creation
+### Development Guidelines
 
-## 🚀 Deployment
+1. **Code Style**: Follow ESLint and Prettier configurations
+2. **Commit Messages**: Use clear, descriptive commit messages
+3. **Testing**: Test thoroughly before committing
+4. **Documentation**: Update README for significant changes
 
-### Desktop Application Deployment
+### Branch Strategy
 
-**Windows Deployment:**
-- Creates NSIS installer executable
-- Includes Excel file in installation directory
-- Registers Start Menu shortcuts
-- Supports silent installation for enterprise deployment
+- `main` - Production-ready code
+- `develop` - Development branch
+- `feature/*` - Feature branches
+- `bugfix/*` - Bug fix branches
 
-**Installation Path:**
-- Default: `C:\Program Files\Digital Compliance Tool\`
-- Data: `C:\Program Files\Digital Compliance Tool\data\templates\trademark-data.xlsx`
+### Pull Request Process
 
-### Distribution Checklist
+1. Create feature branch from `develop`
+2. Make changes with clear commits
+3. Test thoroughly
+4. Update documentation
+5. Submit PR with description
 
-- [ ] Excel file updated with latest trademark data
-- [ ] Version number incremented in package.json
-- [ ] Build tests pass (`npm test`)
-- [ ] Production build successful (`npm run package:win`)
-- [ ] Installer tested on clean machine
-- [ ] Application launches and loads data correctly
-- [ ] Copy generation working end-to-end
-- [ ] All UI components functional
+## License
 
-## 👥 IT Team Handover
+This project is licensed under the ISC License - see the [LICENSE](LICENSE) file for details.
 
-### Knowledge Transfer Priorities
+## Team
 
-1. **Architecture Understanding**
-   - Review `docs/` directory for complete technical documentation
-   - Understand Electron security model and IPC communication
-   - Excel data structure and template engine logic
+**Marketing Compliance Team**  
+Brown-Forman Corporation
 
-2. **Development Environment**
-   - Node.js development workflow
-   - React component architecture
-   - Webpack build system
-   - Electron packaging process
+**Developer**  
+Abhradip Choudhuri
 
-3. **Data Management**
-   - Excel file structure and update procedures
-   - Template engine placeholder system
-   - Multi-language support implementation
+## Acknowledgments
 
-4. **Deployment Process**
-   - Build and packaging workflow
-   - Installer creation and distribution
-   - Enterprise deployment considerations
+- Brown-Forman Corporation
+- Marketing Compliance Team
+- Electron community
+- React team
 
-### Key Technical Contacts
+## Support
 
-- **Frontend Architecture**: React components and hooks
-- **Backend Logic**: Excel processing and template engine
-- **Build System**: Webpack and Electron packaging
-- **Security**: IPC communication and sandboxing
-
-### Maintenance Tasks
-
-| Task | Frequency | Description |
-|------|-----------|-------------|
-| **Data Updates** | As needed | Update Excel file with new trademark data |
-| **Dependency Updates** | Monthly | Update npm packages for security patches |
-| **Feature Enhancements** | Quarterly | Add new asset types or compliance requirements |
-| **Performance Monitoring** | Ongoing | Monitor application performance and memory usage |
-
-## 🗺️ Future Roadmap
-
-### Phase 2: Intranet Web Application
-- **Timeline**: NA
-- **Technology**: React web app with Node.js backend
-- **Database**: PostgreSQL or MongoDB
-- **Authentication**: Active Directory integration
-- **Deployment**: Internal web servers
-
-### Phase 3: API Integration with BAR+
-- **Timeline**: NA  
-- **Integration**: Tenovos DAM system
-- **Features**: Asset metadata sync, automated copy injection
-- **Architecture**: RESTful API with webhook support
-
-### External Resources
-- [Electron Documentation](https://www.electronjs.org/docs)
-- [React Documentation](https://reactjs.org/docs)
-- [Tailwind CSS](https://tailwindcss.com/docs)
-- [SheetJS Documentation](https://docs.sheetjs.com/)
-
-
----
-
-**Built with ❤️ for Marketing Compliance**  
-*Ensuring legal compliance across digital marketing assets worldwide*
+For issues, questions, or feature requests:
+- GitHub Issues: [Report an issue](https://github.com/abhradipchoudhuri/digital-compliance-tool-2/issues)

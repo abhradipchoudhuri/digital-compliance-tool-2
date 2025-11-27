@@ -1205,18 +1205,51 @@ class CopyGenerator {
       trademarkText = trademarkText.replace(/<<Year>>/g, currentYear.toString());
       trademarkText = trademarkText.replace(/<<Entity>>/g, entityName);
       
-      const reserveLanguage = this.safeGetValue(
-        effectiveTmLangData['Reserve Language '] || effectiveTmLangData['Reserve Language'], 
-        'Reserve Language'
-      );
+      // Check if this is a Coca-Cola partnership brand
+      const displayName = brandDataList[0]['Display Names'] || '';
+      const isCocaColaBrand = displayName.toLowerCase().includes('coca cola') || 
+                              displayName.toLowerCase().includes('coca-cola');
       
-      if (thirdParty && thirdParty.trim()) {
-        const reserveWithThirdParty = thirdParty.trim() + ' ' + reserveLanguage;
-        trademarkText = trademarkText.replace(/<<Reserve Language>>/g, reserveWithThirdParty);
-        console.log(`FIX 8: Added Third Party info before Reserve Language: "${thirdParty}"`);
+      let finalReserveLanguage = '';
+      
+      if (isCocaColaBrand) {
+        // For Coca-Cola brands: Use Third Party Rights from Trademark Language sheet
+        let thirdPartyRights = this.safeGetValue(
+          effectiveTmLangData['Third Party Rights'],
+          'Third Party Rights'
+        );
+        
+        // If Third Party Rights is empty/null for this language, fallback to English (Default)
+        if (!thirdPartyRights || thirdPartyRights.trim() === '') {
+          console.log(`COCA-COLA: Third Party Rights empty for ${language}, falling back to English (Default)`);
+          const englishDefault = this.trademarkLanguage.find(tl => 
+            tl['Language'] === 'English (Default)' && tl['Singular vs Plural'] === effectiveSingularOrPlural
+          );
+          
+          if (englishDefault && englishDefault['Third Party Rights']) {
+            thirdPartyRights = englishDefault['Third Party Rights'];
+            console.log(`COCA-COLA: Using English fallback: "${thirdPartyRights}"`);
+          }
+        }
+        
+        finalReserveLanguage = thirdPartyRights || '';
+        console.log(`COCA-COLA BRAND DETECTED: Using Third Party Rights: "${finalReserveLanguage}"`);
       } else {
-        trademarkText = trademarkText.replace(/<<Reserve Language>>/g, reserveLanguage);
+        // Normal brands: use Reserve Language
+        const reserveLanguage = this.safeGetValue(
+          effectiveTmLangData['Reserve Language '] || effectiveTmLangData['Reserve Language'], 
+          'Reserve Language'
+        );
+        
+        if (thirdParty && thirdParty.trim()) {
+          finalReserveLanguage = thirdParty.trim() + ' ' + reserveLanguage;
+          console.log(`FIX 8: Added Third Party info before Reserve Language: "${thirdParty}"`);
+        } else {
+          finalReserveLanguage = reserveLanguage;
+        }
       }
+      
+      trademarkText = trademarkText.replace(/<<Reserve Language>>/g, finalReserveLanguage);
       
       trademarkText = trademarkText.replace(/\s+/g, ' ').trim();
       

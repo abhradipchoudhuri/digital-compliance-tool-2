@@ -6,6 +6,8 @@
 // 3. Added Third Party info to trademark section (for Sinatra and others)
 // 4. All asset types now correctly use US RMD for same-entity multi-brand
 // 5. Fixed normalize function to not strip "Jack Daniel's" when it's the entity name
+// 6. BUG FIX: Coca-Cola brands now show Third Party Rights BEFORE Entity copyright
+// 7. BUG FIX: Generic entity names (Brown-Forman Distillery, Inc) no longer appear in trademarks
 
 class CopyGenerator {
   constructor() {
@@ -69,6 +71,18 @@ class CopyGenerator {
       "Traditional | Retailer Advertising Specialty (ex. Gutter Mat)": "Full",
       "Traditional | Standard TV": "Full"
     };
+    
+    // BUG FIX 2: List of generic entity names that should NOT appear in trademark lists
+    this.GENERIC_ENTITY_NAMES = [
+      'Brown-Forman',
+      'Brown-Forman Corporation',
+      'Brown-Forman Distillery, Inc',
+      'Brown-Forman Distillery Inc',
+      'Brown-Forman Beverages',
+      'Brown-Forman Beverages, Louisville, KY',
+      'Brown Forman',
+      'Brown Forman Corporation'
+    ];
   }
 
   initialize(excelData, excelService) {
@@ -1087,6 +1101,19 @@ class CopyGenerator {
     return '';
   }
 
+  // BUG FIX 2: Helper function to check if an entity name is generic
+  isGenericEntity(entityName) {
+    if (!entityName) return false;
+    
+    // Normalize for comparison
+    const normalized = entityName.toLowerCase().trim();
+    
+    // Check against our list of generic entities
+    return this.GENERIC_ENTITY_NAMES.some(genericName => 
+      normalized === genericName.toLowerCase().trim()
+    );
+  }
+
   buildTrademarkSection(brandDataList, language, assetType, countryCode) {
     const currentYear = new Date().getFullYear();
     
@@ -1196,21 +1223,13 @@ class CopyGenerator {
         console.log(`Single brand with portfolio: "${brandName}"`);
       }
       
-      trademarkText = tmStructure.Structure;
-      
-      trademarkText = trademarkText.replace(/<<Pre-Brand>>/g, preBrand);
-      trademarkText = trademarkText.replace(/<<Brand>>/g, brandName);
-      trademarkText = trademarkText.replace(/<<Registered Language>>/g, 
-        this.safeGetValue(effectiveTmLangData['Registered Language'], 'Registered Language'));
-      trademarkText = trademarkText.replace(/<<Year>>/g, currentYear.toString());
-      trademarkText = trademarkText.replace(/<<Entity>>/g, entityName);
-      
       // Check if this is a Coca-Cola partnership brand
       const displayName = brandDataList[0]['Display Names'] || '';
       const isCocaColaBrand = displayName.toLowerCase().includes('coca cola') || 
                               displayName.toLowerCase().includes('coca-cola');
       
       let finalReserveLanguage = '';
+      let entityCopyright = `©${currentYear} ${entityName}.`;
       
       if (isCocaColaBrand) {
         // For Coca-Cola brands: Use Third Party Rights from Trademark Language sheet
@@ -1234,6 +1253,38 @@ class CopyGenerator {
         
         finalReserveLanguage = thirdPartyRights || '';
         console.log(`COCA-COLA BRAND DETECTED: Using Third Party Rights: "${finalReserveLanguage}"`);
+        
+        // BUG FIX 1: For Coca-Cola brands, swap Entity and Reserve Language order
+        // We need: Brand + Registered + Third Party Rights + Entity
+        // Instead of: Brand + Registered + Entity + Third Party Rights
+        trademarkText = tmStructure.Structure;
+        
+        trademarkText = trademarkText.replace(/<<Pre-Brand>>/g, preBrand);
+        trademarkText = trademarkText.replace(/<<Brand>>/g, brandName);
+        trademarkText = trademarkText.replace(/<<Registered Language>>/g, 
+          this.safeGetValue(effectiveTmLangData['Registered Language'], 'Registered Language'));
+        trademarkText = trademarkText.replace(/<<Year>>/g, currentYear.toString());
+        
+        // For Coca-Cola: Clean Third Party Rights text
+        // Remove any leading ©YYYY pattern (some languages have it, some don't)
+        // Remove trailing period to avoid double periods
+        let thirdPartyRightsClean = finalReserveLanguage
+          .replace(/^©\s*\d{4}\s*/, '')  // Remove leading ©2025 or similar
+          .replace(/\.\s*$/, '');         // Remove trailing period
+        
+        console.log(`COCA-COLA: Cleaned Third Party Rights: "${thirdPartyRightsClean}"`);
+        
+        trademarkText = trademarkText.replace(/<<Entity>>/g, thirdPartyRightsClean);
+        // And Reserve Language placeholder with Entity copyright
+        trademarkText = trademarkText.replace(/<<Reserve Language>>/g, entityCopyright);
+        
+        // CRITICAL FIX: The template structure has ©<<Year>> before <<Entity>>
+        // After replacement, this becomes ©2025 COCA-COLA...
+        // We need to remove this ©2025 that the template added
+        // Match pattern: ©YYYY followed by space, then COCA-COLA
+        trademarkText = trademarkText.replace(/©\s*\d{4}\s+(COCA-COLA)/gi, '$1');
+        
+        console.log(`COCA-COLA: Swapped Entity and Reserve Language order and removed template copyright`);
       } else {
         // Normal brands: use Reserve Language
         const reserveLanguage = this.safeGetValue(
@@ -1247,9 +1298,18 @@ class CopyGenerator {
         } else {
           finalReserveLanguage = reserveLanguage;
         }
+        
+        // Normal brands: standard order
+        trademarkText = tmStructure.Structure;
+        
+        trademarkText = trademarkText.replace(/<<Pre-Brand>>/g, preBrand);
+        trademarkText = trademarkText.replace(/<<Brand>>/g, brandName);
+        trademarkText = trademarkText.replace(/<<Registered Language>>/g, 
+          this.safeGetValue(effectiveTmLangData['Registered Language'], 'Registered Language'));
+        trademarkText = trademarkText.replace(/<<Year>>/g, currentYear.toString());
+        trademarkText = trademarkText.replace(/<<Entity>>/g, entityCopyright);
+        trademarkText = trademarkText.replace(/<<Reserve Language>>/g, finalReserveLanguage);
       }
-      
-      trademarkText = trademarkText.replace(/<<Reserve Language>>/g, finalReserveLanguage);
       
       trademarkText = trademarkText.replace(/\s+/g, ' ').trim();
       
@@ -1278,12 +1338,17 @@ class CopyGenerator {
         console.log(`Processing for trademark: Display="${displayName}", Base="${baseBrandName}", Entity="${entityName}", IsExpression=${isExpression}`);
         
         if (isExpression && entityName) {
-          const entityNormalized = normalizeBrandName(entityName);
-          const hasEntity = brandNames.some(name => normalizeBrandName(name) === entityNormalized);
-          
-          if (!hasEntity) {
-            brandNames.push(entityName);
-            console.log(`  Added entity: ${entityName}`);
+          // BUG FIX 2: Don't add generic entity names to the trademark list
+          if (!this.isGenericEntity(entityName)) {
+            const entityNormalized = normalizeBrandName(entityName);
+            const hasEntity = brandNames.some(name => normalizeBrandName(name) === entityNormalized);
+            
+            if (!hasEntity) {
+              brandNames.push(entityName);
+              console.log(`  Added entity: ${entityName}`);
+            }
+          } else {
+            console.log(`  Skipped generic entity: ${entityName}`);
           }
           
           if (baseBrandName) {

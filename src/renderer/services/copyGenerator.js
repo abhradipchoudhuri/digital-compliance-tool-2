@@ -8,6 +8,7 @@
 // 5. Fixed normalize function to not strip "Jack Daniel's" when it's the entity name
 // 6. BUG FIX: Coca-Cola brands now show Third Party Rights BEFORE Entity copyright
 // 7. BUG FIX: Generic entity names (Brown-Forman Distillery, Inc) no longer appear in trademarks
+// 8. BUG FIX: Removed period from entityCopyright to prevent double periods (Jack Daniel's..)
 
 class CopyGenerator {
   constructor() {
@@ -172,8 +173,11 @@ class CopyGenerator {
       console.log('Template found:', template['Asset Type']);
       console.log('Template structure:', template.Structure);
 
-      const language = this.getLanguageForCountry(countryCode);
-      console.log('Language for country:', { countryCode, language });
+      const languageData = this.getLanguageForCountry(countryCode);
+      const language = languageData.language;
+      const countrySpecific = languageData.countrySpecific;
+      
+      console.log('Language for country:', { countryCode, language, countrySpecific });
 
       const langVars = this.getLanguageVariables(language);
       if (!langVars) {
@@ -214,6 +218,7 @@ class CopyGenerator {
           assetType,
           countryCode,
           language,
+          countrySpecific,
           brandCount: brandIds.length,
           brands: brandDataList.map(b => b.expressionName || b['Brand Names'] || b['Display Names']),
           templateUsed: template['Asset Type'],
@@ -271,11 +276,17 @@ class CopyGenerator {
     );
 
     if (countryData) {
-      return countryData['Language'];
+      return {
+        language: countryData['Language'],
+        countrySpecific: countryData['Country Specific'] || null
+      };
     }
 
     console.warn(`No language found for country ${countryCode}, defaulting to English (Default)`);
-    return 'English (Default)';
+    return {
+      language: 'English (Default)',
+      countrySpecific: null
+    };
   }
 
   getLanguageVariables(language) {
@@ -1123,6 +1134,26 @@ class CopyGenerator {
     
     console.log(`Building trademark section for ${brandDataList.length} brand(s), Language: ${language}, Asset Type: ${assetType}`);
     
+    // CRITICAL: Check if any brand is a Coca-Cola partnership brand
+    // If so, clean up entity names BEFORE processing
+    const hasCocaColaBrand = brandDataList.some(b => {
+      const displayName = b['Display Names'] || '';
+      return displayName.toLowerCase().includes('coca cola') || 
+             displayName.toLowerCase().includes('coca-cola');
+    });
+    
+    if (hasCocaColaBrand) {
+      console.log('COCA-COLA BRAND DETECTED in selection');
+      // Clean entity names for Coca-Cola brands - remove "and The Coca-Cola Company" part
+      brandDataList.forEach(b => {
+        if (b['Entity Names'] && b['Entity Names'].includes(' and ')) {
+          const originalEntity = b['Entity Names'];
+          b['Entity Names'] = b['Entity Names'].split(' and ')[0];
+          console.log(`Cleaned entity: "${originalEntity}" -> "${b['Entity Names']}"`);
+        }
+      });
+    }
+    
     const baseBrands = [...new Set(brandDataList.map(b => b['Brand Names']).filter(Boolean))];
     const isMultipleSameBrand = brandDataList.length > 1 && baseBrands.length === 1;
     
@@ -1223,81 +1254,85 @@ class CopyGenerator {
         console.log(`Single brand with portfolio: "${brandName}"`);
       }
       
-      // Check if this is a Coca-Cola partnership brand
+      // Check if this is a Coca-Cola partnership brand or has Third Party info
       const displayName = brandDataList[0]['Display Names'] || '';
       const isCocaColaBrand = displayName.toLowerCase().includes('coca cola') || 
                               displayName.toLowerCase().includes('coca-cola');
       
       let finalReserveLanguage = '';
-      let entityCopyright = `©${currentYear} ${entityName}.`;
+      let entityCopyright = entityName;
       
-      if (isCocaColaBrand) {
-        // For Coca-Cola brands: Use Third Party Rights from Trademark Language sheet
+      // CRITICAL: Check if brand has Third Party column from Brand Availability (Column E)
+      // For Coca-Cola and Sinatra, we need language-dependent text from Trademark Language sheet
+      const brandThirdParty = thirdParty && thirdParty.trim() ? thirdParty.trim() : '';
+      
+      if (brandThirdParty) {
+        // Brand has Third Party info (Coca-Cola, Sinatra, etc.)
+        // Use Third Party Rights from Trademark Language sheet (Column G - language-dependent)
+        console.log(`THIRD PARTY BRAND DETECTED: "${brandThirdParty}"`);
+        
         let thirdPartyRights = this.safeGetValue(
           effectiveTmLangData['Third Party Rights'],
           'Third Party Rights'
         );
         
-        // If Third Party Rights is empty/null for this language, fallback to English (Default)
+        // If Third Party Rights is empty for this language, fallback to English (Default)
         if (!thirdPartyRights || thirdPartyRights.trim() === '') {
-          console.log(`COCA-COLA: Third Party Rights empty for ${language}, falling back to English (Default)`);
+          console.log(`Third Party Rights empty for ${language}, falling back to English (Default)`);
           const englishDefault = this.trademarkLanguage.find(tl => 
             tl['Language'] === 'English (Default)' && tl['Singular vs Plural'] === effectiveSingularOrPlural
           );
           
           if (englishDefault && englishDefault['Third Party Rights']) {
             thirdPartyRights = englishDefault['Third Party Rights'];
-            console.log(`COCA-COLA: Using English fallback: "${thirdPartyRights}"`);
+            console.log(`Using English fallback: "${thirdPartyRights}"`);
           }
         }
         
-        finalReserveLanguage = thirdPartyRights || '';
-        console.log(`COCA-COLA BRAND DETECTED: Using Third Party Rights: "${finalReserveLanguage}"`);
-        
-        // BUG FIX 1: For Coca-Cola brands, swap Entity and Reserve Language order
-        // We need: Brand + Registered + Third Party Rights + Entity
-        // Instead of: Brand + Registered + Entity + Third Party Rights
-        trademarkText = tmStructure.Structure;
-        
-        trademarkText = trademarkText.replace(/<<Pre-Brand>>/g, preBrand);
-        trademarkText = trademarkText.replace(/<<Brand>>/g, brandName);
-        trademarkText = trademarkText.replace(/<<Registered Language>>/g, 
-          this.safeGetValue(effectiveTmLangData['Registered Language'], 'Registered Language'));
-        trademarkText = trademarkText.replace(/<<Year>>/g, currentYear.toString());
-        
-        // For Coca-Cola: Clean Third Party Rights text
-        // Remove any leading ©YYYY pattern (some languages have it, some don't)
-        // Remove trailing period to avoid double periods
-        let thirdPartyRightsClean = finalReserveLanguage
-          .replace(/^©\s*\d{4}\s*/, '')  // Remove leading ©2025 or similar
-          .replace(/\.\s*$/, '');         // Remove trailing period
-        
-        console.log(`COCA-COLA: Cleaned Third Party Rights: "${thirdPartyRightsClean}"`);
-        
-        trademarkText = trademarkText.replace(/<<Entity>>/g, thirdPartyRightsClean);
-        // And Reserve Language placeholder with Entity copyright
-        trademarkText = trademarkText.replace(/<<Reserve Language>>/g, entityCopyright);
-        
-        // CRITICAL FIX: The template structure has ©<<Year>> before <<Entity>>
-        // After replacement, this becomes ©2025 COCA-COLA...
-        // We need to remove this ©2025 that the template added
-        // Match pattern: ©YYYY followed by space, then COCA-COLA
-        trademarkText = trademarkText.replace(/©\s*\d{4}\s+(COCA-COLA)/gi, '$1');
-        
-        console.log(`COCA-COLA: Swapped Entity and Reserve Language order and removed template copyright`);
-      } else {
-        // Normal brands: use Reserve Language
+        // Get Reserve Language (e.g., "All rights reserved.")
         const reserveLanguage = this.safeGetValue(
           effectiveTmLangData['Reserve Language '] || effectiveTmLangData['Reserve Language'], 
           'Reserve Language'
         );
         
-        if (thirdParty && thirdParty.trim()) {
-          finalReserveLanguage = thirdParty.trim() + ' ' + reserveLanguage;
-          console.log(`FIX 8: Added Third Party info before Reserve Language: "${thirdParty}"`);
+        // Combine: Third Party Rights + Reserve Language
+        finalReserveLanguage = thirdPartyRights + (reserveLanguage ? ' ' + reserveLanguage : '');
+        console.log(`THIRD PARTY: Using language-dependent text: "${thirdPartyRights}" + "${reserveLanguage}"`);
+        
+        // Check if template has <<Reserve Language>> placeholder
+        trademarkText = tmStructure.Structure;
+        
+        if (trademarkText.includes('<<Reserve Language>>')) {
+          // Full template - has Reserve Language placeholder
+          trademarkText = trademarkText.replace(/<<Pre-Brand>>/g, preBrand);
+          trademarkText = trademarkText.replace(/<<Brand>>/g, brandName);
+          trademarkText = trademarkText.replace(/<<Registered Language>>/g, 
+            this.safeGetValue(effectiveTmLangData['Registered Language'], 'Registered Language'));
+          trademarkText = trademarkText.replace(/<<Year>>/g, currentYear.toString());
+          trademarkText = trademarkText.replace(/<<Entity>>/g, entityCopyright);
+          trademarkText = trademarkText.replace(/<<Reserve Language>>/g, finalReserveLanguage);
         } else {
-          finalReserveLanguage = reserveLanguage;
+          // Tightened/Limited Character templates - NO Reserve Language placeholder
+          // Append Third Party text after entity
+          trademarkText = trademarkText.replace(/<<Pre-Brand>>/g, preBrand);
+          trademarkText = trademarkText.replace(/<<Brand>>/g, brandName);
+          trademarkText = trademarkText.replace(/<<Registered Language>>/g, 
+            this.safeGetValue(effectiveTmLangData['Registered Language'], 'Registered Language'));
+          trademarkText = trademarkText.replace(/<<Year>>/g, currentYear.toString());
+          trademarkText = trademarkText.replace(/<<Entity>>/g, entityCopyright);
+          // Append Third Party + Reserve Language at the end
+          trademarkText = trademarkText.trim() + ' ' + finalReserveLanguage;
+          console.log(`THIRD PARTY: Appended to Tightened/Limited template`);
         }
+        
+      } else {
+        // Normal brands without Third Party: use Reserve Language only
+        const reserveLanguage = this.safeGetValue(
+          effectiveTmLangData['Reserve Language '] || effectiveTmLangData['Reserve Language'], 
+          'Reserve Language'
+        );
+        
+        finalReserveLanguage = reserveLanguage;
         
         // Normal brands: standard order
         trademarkText = tmStructure.Structure;
@@ -1311,6 +1346,7 @@ class CopyGenerator {
         trademarkText = trademarkText.replace(/<<Reserve Language>>/g, finalReserveLanguage);
       }
       
+      // Clean up spacing
       trademarkText = trademarkText.replace(/\s+/g, ' ').trim();
       
       console.log(`Singular trademark: ${trademarkText}`);
@@ -1389,14 +1425,14 @@ class CopyGenerator {
       let entityCopyrights = '';
       
       if (sameEntity && portfolioEntity && portfolioEntity !== 'Brown-Forman Corporation' && portfolioEntity !== 'Brown-Forman') {
-        entityCopyrights = `©${currentYear} ${portfolioEntity}.`;
+        entityCopyrights = `©${currentYear} ${portfolioEntity}`;
         console.log(`Same portfolio - using single entity: ${portfolioEntity}`);
       } else {
         const brownFormanEntity = entities.find(e => 
           e === 'Brown-Forman' || e === 'Brown-Forman Corporation'
         ) || 'Brown-Forman';
         
-        entityCopyrights = `©${currentYear} ${brownFormanEntity}.`;
+        entityCopyrights = `©${currentYear} ${brownFormanEntity}`;
         console.log(`Different brands - using consolidated entity: ${brownFormanEntity}`);
       }
       
@@ -1409,11 +1445,39 @@ class CopyGenerator {
       
       console.log(`Reserve Language value: "${reserveLanguage}"`);
       
+      // CRITICAL: Check if ANY brand has Third Party column from Brand Availability (Column E)
+      // For Coca-Cola, Sinatra, etc., use language-dependent text from Trademark Language sheet
       const brandsWithThirdParty = brandDataList.filter(b => b['Third Party'] && b['Third Party'].trim());
-      let thirdPartyInfo = '';
+      
+      let finalReserveForMulti = '';
       if (brandsWithThirdParty.length > 0) {
-        thirdPartyInfo = brandsWithThirdParty[0]['Third Party'].trim();
-        console.log(`FIX 8: Found Third Party info in multi-brand: "${thirdPartyInfo}"`);
+        // At least one brand has Third Party info (Coca-Cola, Sinatra, etc.)
+        // Use Third Party Rights from Trademark Language sheet (Column G - language-dependent)
+        console.log(`THIRD PARTY BRAND in multi-brand detected`);
+        
+        let thirdPartyRights = this.safeGetValue(
+          effectiveTmLangData['Third Party Rights'],
+          'Third Party Rights'
+        );
+        
+        // If Third Party Rights is empty for this language, fallback to English (Default)
+        if (!thirdPartyRights || thirdPartyRights.trim() === '') {
+          console.log(`Third Party Rights empty for ${language}, falling back to English (Default)`);
+          const englishDefault = this.trademarkLanguage.find(tl => 
+            tl['Language'] === 'English (Default)' && tl['Singular vs Plural'] === effectiveSingularOrPlural
+          );
+          
+          if (englishDefault && englishDefault['Third Party Rights']) {
+            thirdPartyRights = englishDefault['Third Party Rights'];
+          }
+        }
+        
+        // Combine: Third Party Rights + Reserve Language
+        finalReserveForMulti = thirdPartyRights + (reserveLanguage ? ' ' + reserveLanguage : '');
+        console.log(`THIRD PARTY multi-brand: "${thirdPartyRights}" + "${reserveLanguage}"`);
+      } else {
+        // No Third Party text - use Reserve Language only
+        finalReserveForMulti = reserveLanguage;
       }
       
       const parts = [];
@@ -1426,11 +1490,8 @@ class CopyGenerator {
       parts.push(registeredLanguage);
       parts.push(entityCopyrights);
       
-      if (thirdPartyInfo && reserveLanguage) {
-        parts.push(thirdPartyInfo + ' ' + reserveLanguage);
-        console.log(`FIX 8: Added Third Party info to multi-brand trademark`);
-      } else if (reserveLanguage) {
-        parts.push(reserveLanguage);
+      if (finalReserveForMulti) {
+        parts.push(finalReserveForMulti);
       }
       
       trademarkText = parts.join(' ').replace(/\s+/g, ' ').trim();

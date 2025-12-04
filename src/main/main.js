@@ -45,7 +45,8 @@ function createWindow() {
   // Load the app
   if (isDev) {
     mainWindow.loadURL('http://localhost:3000');
-    mainWindow.webContents.openDevTools();
+    // ✅ REMOVED: DevTools no longer open automatically
+    // mainWindow.webContents.openDevTools();
   } else {
     mainWindow.loadFile(path.join(__dirname, '../..', 'dist', 'index.html'));
   }
@@ -54,10 +55,10 @@ function createWindow() {
   mainWindow.once('ready-to-show', () => {
     mainWindow.show();
     
-    // Focus on window
-    if (isDev) {
-      mainWindow.webContents.openDevTools();
-    }
+    // ✅ REMOVED: DevTools no longer open automatically in development
+    // if (isDev) {
+    //   mainWindow.webContents.openDevTools();
+    // }
   });
 
   // Handle window closed
@@ -70,6 +71,13 @@ function createWindow() {
   
   // Set up IPC handlers
   setupIPC();
+}
+
+// ============================================
+// FUNCTION TO GET MAIN WINDOW (for menu access)
+// ============================================
+function getMainWindow() {
+  return mainWindow;
 }
 
 // ============================================
@@ -355,7 +363,7 @@ function setupIPC() {
 // APP EVENT HANDLERS
 // ============================================
 app.whenReady().then(() => {
-  createMenu(); // Set up the custom menu first
+  createMenu(getMainWindow); // Pass getMainWindow function to menu
   createWindow();
 
   app.on('activate', () => {

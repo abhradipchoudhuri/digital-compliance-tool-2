@@ -435,6 +435,7 @@ const App = () => {
   /**
    * Handle copy generation
    * Validates inputs, calls templateService, and displays results
+   * NEW FEATURE: Combines Asset Type Instructions with Country Specific instructions
    */
   const handleGenerate = async () => {
     if (!selectedAssetType) {
@@ -472,17 +473,74 @@ const App = () => {
       console.log('Selected asset type NAME:', assetTypeName);
       console.log('Selected country:', selectedCountry);
       
+      // ============================================
+      // NEW FEATURE: Fetch Asset Type Instructions + Country Specific Instructions
+      // ============================================
       const trademarkConfig = excelContext.rawData?.['Trademark Config'] || [];
       const assetTypeRow = trademarkConfig.find(row => 
         row['Asset Type'] === assetTypeName
       );
       
+      // Get Asset Type Instructions
+      let combinedInstructions = '';
+      
       if (assetTypeRow && assetTypeRow['Asset Type Instructions']) {
-        setAssetTypeInstructions(assetTypeRow['Asset Type Instructions']);
+        combinedInstructions = assetTypeRow['Asset Type Instructions'];
         console.log('Found Asset Type Instructions for:', assetTypeName);
       } else {
         console.log('No Asset Type Instructions found for:', assetTypeName);
       }
+      
+      // Add Country Specific instructions if available from CountryLanguage sheet Column D
+      const countryLanguageSheet = excelContext.rawData?.['CountryLanguage'] || [];
+      const countryData = countryLanguageSheet.find(row => 
+        row['Abbv'] === selectedCountry || 
+        row['Country Code'] === selectedCountry ||
+        row['CountryCode'] === selectedCountry
+      );
+      
+      if (countryData && countryData['Country Specific']) {
+        // Extract the actual string value from the cell (handles both strings and rich text objects)
+        let countrySpecificText = countryData['Country Specific'];
+        
+        // If it's an object (rich text), extract the text property
+        if (typeof countrySpecificText === 'object' && countrySpecificText !== null) {
+          if (countrySpecificText.text) {
+            countrySpecificText = countrySpecificText.text;
+          } else if (countrySpecificText.richText) {
+            // Handle rich text array
+            countrySpecificText = countrySpecificText.richText.map(rt => rt.text || '').join('');
+          } else {
+            // Fallback: try to stringify
+            countrySpecificText = String(countrySpecificText);
+          }
+        }
+        
+        // Convert to string if it's not already
+        countrySpecificText = String(countrySpecificText || '');
+        
+        // Only use if it's not empty and not "None"
+        if (countrySpecificText && countrySpecificText.trim() !== '' && countrySpecificText.trim() !== 'None') {
+          if (combinedInstructions) {
+            // If we have asset type instructions, add country specific after it with spacing
+            combinedInstructions += '<br><br>' + countrySpecificText;
+          } else {
+            // If no asset type instructions, just use country specific
+            combinedInstructions = countrySpecificText;
+          }
+          console.log('Added Country Specific instructions for:', selectedCountry);
+        }
+      }
+      
+      // Set the combined instructions
+      if (combinedInstructions) {
+        setAssetTypeInstructions(combinedInstructions);
+        console.log('Total instructions set (Asset Type + Country Specific)');
+      } else {
+        setAssetTypeInstructions(null);
+        console.log('No instructions to display');
+      }
+      // ============================================
       
       const result = await templateService.generateCopy({
         assetType: assetTypeName,
@@ -1058,6 +1116,7 @@ const App = () => {
               ) : null}
             </div>
 
+            {/* NEW FEATURE: Asset Type Instructions + Country Specific Instructions Combined Card */}
             {assetTypeInstructions && generatedCopy && (
               <div className={`mt-6 rounded-2xl shadow-lg p-6 border-2 hover-lift-subtle animate-fade-in relative overflow-hidden transition-colors duration-300 ${
                 isDarkMode 
@@ -1087,8 +1146,6 @@ const App = () => {
             )}
           </div>
         </div>
-
-        {/* FEATURE: Development Status Card REMOVED as requested */}
 
         <footer className="mt-12 pb-6 text-center animate-fade-in">
           <div className={`inline-flex items-center gap-2 px-6 py-3 rounded-full shadow-lg border-2 transition-all hover-lift-subtle duration-300 ${

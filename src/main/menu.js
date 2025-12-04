@@ -1,11 +1,11 @@
 // src/main/menu.js
-// Simplified Application Menu - Window and Help only
+// Application Menu with Console Log Toggle
 
 const { Menu, shell, app } = require('electron');
 
 const isMac = process.platform === 'darwin';
 
-function createMenu() {
+function createMenu(getMainWindowFunc) {
   const template = [
     // Window Menu
     {
@@ -23,10 +23,26 @@ function createMenu() {
       label: 'Help',
       submenu: [
         {
+          label: 'Console Log',
+          accelerator: 'CmdOrCtrl+Shift+I',
+          click: () => {
+            const mainWindow = getMainWindowFunc();
+            if (mainWindow) {
+              if (mainWindow.webContents.isDevToolsOpened()) {
+                mainWindow.webContents.closeDevTools();
+              } else {
+                mainWindow.webContents.openDevTools();
+              }
+            }
+          }
+        },
+        { type: 'separator' },
+        {
           label: 'About Digital Compliance Tool',
           click: async () => {
             const { dialog } = require('electron');
-            dialog.showMessageBox({
+            const mainWindow = getMainWindowFunc();
+            dialog.showMessageBox(mainWindow, {
               type: 'info',
               title: 'About Digital Compliance Tool',
               message: 'Digital Compliance Tool',

@@ -1,3 +1,6 @@
+// src/renderer/components/common/DataTest.jsx
+// Component for testing and debugging Excel data loading
+
 import React, { useState } from 'react';
 import { useExcelData } from '@hooks/useDataLoader';
 
@@ -16,6 +19,9 @@ const DataTest = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState([]);
 
+  /**
+   * Handle brand search
+   */
   const handleSearch = () => {
     if (searchQuery.trim()) {
       const results = searchBrands(searchQuery);
@@ -53,7 +59,7 @@ const DataTest = () => {
     <div className="p-6 space-y-6">
       <h2 className="text-2xl font-bold text-bf-blue">Excel Data Test</h2>
       
-      {/* Data Summary */}
+      {/* Data Summary Statistics */}
       <div className="grid grid-cols-3 gap-4">
         <div className="bg-blue-50 p-4 rounded-lg">
           <h3 className="font-semibold text-blue-800">Brands</h3>
@@ -69,7 +75,7 @@ const DataTest = () => {
         </div>
       </div>
 
-      {/* Brand Search Test */}
+      {/* Brand Search Testing Interface */}
       <div className="bg-gray-50 p-4 rounded-lg">
         <h3 className="text-lg font-semibold mb-3">Brand Search Test</h3>
         <div className="flex gap-2 mb-3">
@@ -125,7 +131,7 @@ const DataTest = () => {
         </div>
       </div>
 
-      {/* Help Text Display */}
+      {/* Help Text Preview */}
       {helpText && (
         <div className="bg-yellow-50 p-4 rounded-lg">
           <h3 className="font-semibold mb-2">Help Text Preview</h3>

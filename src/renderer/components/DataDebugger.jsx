@@ -1,5 +1,5 @@
 // src/renderer/components/DataDebugger.jsx
-// Excel Data Debugger Component - Inspect loaded Excel data structure
+// Excel Data Debugger Component - Inspect loaded Excel data structure and values
 
 import React, { useState, useMemo } from 'react';
 import { useExcelData } from '../index';
@@ -15,14 +15,15 @@ const DataDebugger = () => {
   });
   const [searchTerm, setSearchTerm] = useState('');
 
-  // Get data from context
   const brands = context.getBrands();
   const countries = context.getCountries();
   const assetTypes = context.getAssetTypes();
   const sheets = Object.keys(context.rawData || {});
   const currentSheetData = context.rawData?.[selectedSheet] || [];
 
-  // Filter brands by search term
+  /**
+   * Filter brands by search term
+   */
   const filteredBrands = useMemo(() => {
     if (!searchTerm) return brands.slice(0, 10);
     return brands.filter(brand =>
@@ -31,7 +32,9 @@ const DataDebugger = () => {
     ).slice(0, 10);
   }, [brands, searchTerm]);
 
-  // Toggle section expansion
+  /**
+   * Toggle section expansion state
+   */
   const toggleSection = (section) => {
     setExpandedSections(prev => ({
       ...prev,
@@ -39,7 +42,9 @@ const DataDebugger = () => {
     }));
   };
 
-  // Section Header Component
+  /**
+   * Collapsible section header component
+   */
   const SectionHeader = ({ title, icon: Icon, section, count }) => (
     <div
       className="flex items-center justify-between p-4 bg-gradient-to-r from-bf-blue to-blue-600 text-bf-gold cursor-pointer hover:from-blue-600 hover:to-bf-blue transition-all"
@@ -69,7 +74,7 @@ const DataDebugger = () => {
         <div className="flex items-center space-x-3">
           <Database className="w-8 h-8" />
           <div>
-            <h2 className="text-2xl font-bold"> Excel Data Debugger</h2>
+            <h2 className="text-2xl font-bold">Excel Data Debugger</h2>
             <p className="text-sm opacity-90">Inspect loaded Excel data structure and values</p>
           </div>
         </div>
@@ -153,7 +158,7 @@ const DataDebugger = () => {
 
             {currentSheetData.length > 0 ? (
               <>
-                {/* Headers Display */}
+                {/* Column Headers Display */}
                 <div className="mb-6">
                   <h4 className="text-sm font-semibold text-gray-700 mb-3 flex items-center">
                     <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded mr-2">
@@ -173,7 +178,7 @@ const DataDebugger = () => {
                   </div>
                 </div>
 
-                {/* First Row Data */}
+                {/* First Row Sample Data */}
                 <div className="mb-6">
                   <h4 className="text-sm font-semibold text-gray-700 mb-3">
                     First Row (Sample Data):
@@ -185,7 +190,7 @@ const DataDebugger = () => {
                   </div>
                 </div>
 
-                {/* Second Row Data (if exists) */}
+                {/* Second Row Comparison */}
                 {currentSheetData.length > 1 && (
                   <div className="mb-6">
                     <h4 className="text-sm font-semibold text-gray-700 mb-3">
@@ -244,7 +249,6 @@ const DataDebugger = () => {
                   </h3>
                 </div>
                 <div className="p-4">
-                  {/* Search */}
                   <div className="mb-3">
                     <input
                       type="text"
@@ -324,7 +328,7 @@ const DataDebugger = () => {
                         <div key={idx} className="p-3 bg-purple-50 rounded-lg border border-purple-100">
                           <div className="font-semibold text-purple-900 text-sm">{country.name}</div>
                           <div className="text-xs text-purple-600 mt-1">
-                            Code: {country.code} • Language: {country.language}
+                            Code: {country.code} | Language: {country.language}
                           </div>
                         </div>
                       ))
@@ -341,27 +345,27 @@ const DataDebugger = () => {
               </div>
             </div>
 
-            {/* Filter Logic Info */}
+            {/* Filter Logic Information */}
             <div className="mt-6 bg-yellow-50 border border-yellow-200 rounded-lg p-4">
               <h4 className="text-sm font-semibold text-yellow-800 mb-2">
-                🔍 Filter Logic Applied:
+                Filter Logic Applied:
               </h4>
               <div className="text-xs text-yellow-700 space-y-1">
-                <p>• <strong>Brands:</strong> Filters 'Trademark Config' where Type === 'Brand'</p>
-                <p>• <strong>Asset Types:</strong> Filters 'Trademark Config' where Type === 'Asset Type'</p>
-                <p>• <strong>Countries:</strong> Unique values from 'CountryLanguage' by CountryCode</p>
+                <p>- <strong>Brands:</strong> Filters 'Trademark Config' where Type === 'Brand'</p>
+                <p>- <strong>Asset Types:</strong> Filters 'Trademark Config' where Type === 'Asset Type'</p>
+                <p>- <strong>Countries:</strong> Unique values from 'CountryLanguage' by CountryCode</p>
               </div>
             </div>
           </div>
         )}
       </div>
 
-      {/* Footer with Tips */}
+      {/* Footer with Debugging Tips */}
       <div className="bg-gray-100 p-4 border-t border-gray-300">
         <div className="flex items-start space-x-2 text-sm text-gray-600">
-          <div className="flex-shrink-0 mt-0.5">💡</div>
+          <div className="flex-shrink-0 mt-0.5">Tip:</div>
           <div>
-            <strong>Debugging Tips:</strong> If processed data shows 0 results, check the Raw Data Inspector 
+            <strong>Debugging:</strong> If processed data shows 0 results, check the Raw Data Inspector 
             to verify column names match the filter logic in excelService.js (Type, ID, Name, etc.)
           </div>
         </div>

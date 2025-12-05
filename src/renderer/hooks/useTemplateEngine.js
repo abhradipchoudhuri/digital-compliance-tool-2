@@ -1,5 +1,5 @@
 // src/renderer/hooks/useTemplateEngine.js
-// React hook for managing template engine and copy generation
+// React hook for managing template engine and copy generation workflow
 
 import { useState, useCallback, useRef } from 'react';
 import templateService from '@services/templateService';
@@ -13,16 +13,15 @@ export const useTemplateEngine = () => {
   const abortControllerRef = useRef(null);
 
   /**
-   * Generate legal copy
+   * Generate legal copy with provided parameters
    */
   const generateCopy = useCallback(async (params) => {
     try {
       setIsGenerating(true);
       setError(null);
 
-      console.log('useTemplateEngine: Starting copy generation...', params);
+      console.log('useTemplateEngine: Starting copy generation', params);
 
-      // Create abort controller for potential cancellation
       abortControllerRef.current = new AbortController();
 
       // Validate parameters
@@ -31,7 +30,7 @@ export const useTemplateEngine = () => {
         throw new Error(`Invalid parameters: ${validation.errors.join(', ')}`);
       }
 
-      // Add slight delay to show loading state (mimics server processing)
+      // Simulate server processing delay
       await new Promise(resolve => setTimeout(resolve, 500));
 
       // Check if generation was aborted
@@ -58,7 +57,7 @@ export const useTemplateEngine = () => {
         }
       };
 
-      setHistory(prev => [historyEntry, ...prev.slice(0, 49)]); // Keep last 50 entries
+      setHistory(prev => [historyEntry, ...prev.slice(0, 49)]);
       setGeneratedCopy(result.result);
 
       console.log('useTemplateEngine: Copy generated successfully');
@@ -94,7 +93,7 @@ export const useTemplateEngine = () => {
   }, []);
 
   /**
-   * Regenerate copy with same parameters
+   * Regenerate copy using parameters from history
    */
   const regenerateCopy = useCallback(async (historyId) => {
     const historyEntry = history.find(entry => entry.id === historyId);
@@ -122,7 +121,6 @@ export const useTemplateEngine = () => {
     };
   }, [history]);
 
-  // Helper function to get most used value from history
   const getMostUsedValue = (paramKey) => {
     if (history.length === 0) return null;
 
@@ -137,7 +135,6 @@ export const useTemplateEngine = () => {
     return Object.keys(counts).reduce((a, b) => counts[a] > counts[b] ? a : b, null);
   };
 
-  // Helper function to get most used brand
   const getMostUsedBrand = () => {
     if (history.length === 0) return null;
 
@@ -154,7 +151,7 @@ export const useTemplateEngine = () => {
   };
 
   /**
-   * Export history as JSON
+   * Export history as JSON file
    */
   const exportHistory = useCallback(() => {
     const exportData = {
@@ -162,7 +159,6 @@ export const useTemplateEngine = () => {
       totalEntries: history.length,
       history: history.map(entry => ({
         ...entry,
-        // Remove large content for smaller file size
         result: {
           ...entry.result,
           html: entry.result.html?.substring(0, 500) + '...',
@@ -186,26 +182,25 @@ export const useTemplateEngine = () => {
   }, [history]);
 
   /**
-   * Clear history
+   * Clear all history entries
    */
   const clearHistory = useCallback(() => {
     setHistory([]);
   }, []);
 
   /**
-   * Remove specific history entry
+   * Remove specific history entry by ID
    */
   const removeHistoryEntry = useCallback((historyId) => {
     setHistory(prev => prev.filter(entry => entry.id !== historyId));
   }, []);
 
   /**
-   * Copy text to clipboard
+   * Copy text to clipboard with format support
    */
   const copyToClipboard = useCallback(async (text, format = 'plain') => {
     try {
       if (format === 'html') {
-        // For HTML, create a rich text clipboard item
         const clipboardItem = new ClipboardItem({
           'text/html': new Blob([text], { type: 'text/html' }),
           'text/plain': new Blob([text.replace(/<[^>]*>/g, '')], { type: 'text/plain' })
@@ -222,7 +217,7 @@ export const useTemplateEngine = () => {
   }, []);
 
   /**
-   * Get template preview
+   * Get template preview for asset type
    */
   const getTemplatePreview = useCallback((assetType) => {
     try {
@@ -234,7 +229,7 @@ export const useTemplateEngine = () => {
   }, []);
 
   /**
-   * Get available templates
+   * Get all available templates
    */
   const getAvailableTemplates = useCallback(() => {
     try {
@@ -246,7 +241,7 @@ export const useTemplateEngine = () => {
   }, []);
 
   /**
-   * Get compliance rules for country
+   * Get compliance rules for specific country
    */
   const getComplianceRules = useCallback((countryCode) => {
     try {
@@ -258,7 +253,7 @@ export const useTemplateEngine = () => {
   }, []);
 
   /**
-   * Download generated copy as file
+   * Download generated copy as text file
    */
   const downloadCopy = useCallback((copy, filename) => {
     if (!copy) {
@@ -284,24 +279,17 @@ export const useTemplateEngine = () => {
   }, []);
 
   return {
-    // State
     isGenerating,
     generatedCopy,
     error,
     history,
-
-    // Actions
     generateCopy,
     cancelGeneration,
     clearResults,
     regenerateCopy,
-
-    // History management
     clearHistory,
     removeHistoryEntry,
     exportHistory,
-
-    // Utilities
     copyToClipboard,
     downloadCopy,
     getStats,
@@ -311,7 +299,9 @@ export const useTemplateEngine = () => {
   };
 };
 
-// Additional hook for simplified copy generation
+/**
+ * Simplified hook for basic copy generation
+ */
 export const useSimpleCopyGenerator = () => {
   const {
     isGenerating,
@@ -323,9 +313,6 @@ export const useSimpleCopyGenerator = () => {
     downloadCopy
   } = useTemplateEngine();
 
-  /**
-   * Simplified generate function with common defaults
-   */
   const generate = useCallback(async (assetType, countryCode, brandIds) => {
     const params = {
       assetType,
@@ -347,7 +334,9 @@ export const useSimpleCopyGenerator = () => {
   };
 };
 
-// Hook for template management
+/**
+ * Hook for template management operations
+ */
 export const useTemplateManager = () => {
   const [templates, setTemplates] = useState([]);
   const [loading, setLoading] = useState(false);

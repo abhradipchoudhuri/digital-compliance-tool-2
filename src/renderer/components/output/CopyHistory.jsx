@@ -1,394 +1,186 @@
-// src/renderer/hooks/useTemplateEngine.js
-// React hook for managing template engine and copy generation
+// src/renderer/components/output/CopyHistory.jsx
+// UI component for displaying copy generation history
 
-import { useState, useCallback, useRef } from 'react';
-import templateService from '@services/templateService';
-import validationService from '@services/validationService';
+import React, { useState } from 'react';
+import PropTypes from 'prop-types';
+import { Clock, Download, Copy, Trash2, RefreshCw, Calendar } from 'lucide-react';
 
-export const useTemplateEngine = () => {
-  const [isGenerating, setIsGenerating] = useState(false);
-  const [generatedCopy, setGeneratedCopy] = useState(null);
-  const [error, setError] = useState(null);
-  const [history, setHistory] = useState([]);
-  const abortControllerRef = useRef(null);
+/**
+ * CopyHistory Component
+ * Displays history of generated copies with actions
+ */
+const CopyHistory = ({ history, onRegenerate, onRemove, onClear, onCopyToClipboard, onDownload }) => {
+  const [expandedEntry, setExpandedEntry] = useState(null);
 
-  /**
-   * Generate legal copy
-   */
-  const generateCopy = useCallback(async (params) => {
-    try {
-      setIsGenerating(true);
-      setError(null);
-
-      console.log('useTemplateEngine: Starting copy generation...', params);
-
-      // Create abort controller for potential cancellation
-      abortControllerRef.current = new AbortController();
-
-      // Validate parameters
-      const validation = validationService.validateGenerationParams(params);
-      if (!validation.isValid) {
-        throw new Error(`Invalid parameters: ${validation.errors.join(', ')}`);
-      }
-
-      // Add slight delay to show loading state (mimics server processing)
-      await new Promise(resolve => setTimeout(resolve, 500));
-
-      // Check if generation was aborted
-      if (abortControllerRef.current?.signal.aborted) {
-        throw new Error('Copy generation was cancelled');
-      }
-
-      // Generate copy using template service
-      const result = await templateService.generateCopy(params);
-
-      if (!result.success) {
-        throw new Error(result.error || 'Failed to generate copy');
-      }
-
-      // Add to history
-      const historyEntry = {
-        id: Date.now(),
-        timestamp: new Date().toISOString(),
-        params: { ...params },
-        result: result.result,
-        metadata: {
-          ...result.result.metadata,
-          generationTime: new Date().toISOString()
-        }
-      };
-
-      setHistory(prev => [historyEntry, ...prev.slice(0, 49)]); // Keep last 50 entries
-      setGeneratedCopy(result.result);
-
-      console.log('useTemplateEngine: Copy generated successfully');
-      return result.result;
-
-    } catch (err) {
-      console.error('useTemplateEngine: Error generating copy:', err);
-      setError(err.message);
-      return null;
-    } finally {
-      setIsGenerating(false);
-      abortControllerRef.current = null;
-    }
-  }, []);
+  if (!history || history.length === 0) {
+    return (
+      <div className="bg-white rounded-lg border-2 border-gray-200 p-8 text-center">
+        <Calendar className="w-16 h-16 mx-auto text-gray-300 mb-4" />
+        <h3 className="text-lg font-semibold text-gray-700 mb-2">No History Yet</h3>
+        <p className="text-gray-500">Your copy generation history will appear here</p>
+      </div>
+    );
+  }
 
   /**
-   * Cancel ongoing generation
+   * Toggle entry expansion
    */
-  const cancelGeneration = useCallback(() => {
-    if (abortControllerRef.current) {
-      abortControllerRef.current.abort();
-      setIsGenerating(false);
-      setError('Copy generation was cancelled');
-    }
-  }, []);
-
-  /**
-   * Clear current results and error
-   */
-  const clearResults = useCallback(() => {
-    setGeneratedCopy(null);
-    setError(null);
-  }, []);
-
-  /**
-   * Regenerate copy with same parameters
-   */
-  const regenerateCopy = useCallback(async (historyId) => {
-    const historyEntry = history.find(entry => entry.id === historyId);
-    if (!historyEntry) {
-      setError('History entry not found');
-      return null;
-    }
-
-    return await generateCopy(historyEntry.params);
-  }, [history, generateCopy]);
-
-  /**
-   * Get copy generation statistics
-   */
-  const getStats = useCallback(() => {
-    return {
-      totalGenerations: history.length,
-      lastGenerated: history.length > 0 ? history[0].timestamp : null,
-      averageGenerationTime: history.length > 0 
-        ? history.reduce((acc, entry) => acc + (entry.metadata.generationTime ? 1 : 0), 0) / history.length
-        : 0,
-      mostUsedAssetType: getMostUsedValue('assetType'),
-      mostUsedCountry: getMostUsedValue('countryCode'),
-      mostUsedBrand: getMostUsedBrand()
-    };
-  }, [history]);
-
-  // Helper function to get most used value from history
-  const getMostUsedValue = (paramKey) => {
-    if (history.length === 0) return null;
-
-    const counts = {};
-    history.forEach(entry => {
-      const value = entry.params[paramKey];
-      if (value) {
-        counts[value] = (counts[value] || 0) + 1;
-      }
-    });
-
-    return Object.keys(counts).reduce((a, b) => counts[a] > counts[b] ? a : b, null);
-  };
-
-  // Helper function to get most used brand
-  const getMostUsedBrand = () => {
-    if (history.length === 0) return null;
-
-    const counts = {};
-    history.forEach(entry => {
-      if (entry.params.brandIds && Array.isArray(entry.params.brandIds)) {
-        entry.params.brandIds.forEach(brandId => {
-          counts[brandId] = (counts[brandId] || 0) + 1;
-        });
-      }
-    });
-
-    return Object.keys(counts).reduce((a, b) => counts[a] > counts[b] ? a : b, null);
+  const toggleEntry = (entryId) => {
+    setExpandedEntry(expandedEntry === entryId ? null : entryId);
   };
 
   /**
-   * Export history as JSON
+   * Format timestamp for display
    */
-  const exportHistory = useCallback(() => {
-    const exportData = {
-      exported: new Date().toISOString(),
-      totalEntries: history.length,
-      history: history.map(entry => ({
-        ...entry,
-        // Remove large content for smaller file size
-        result: {
-          ...entry.result,
-          html: entry.result.html?.substring(0, 500) + '...',
-          plainText: entry.result.plainText?.substring(0, 500) + '...'
-        }
-      }))
-    };
-
-    const blob = new Blob([JSON.stringify(exportData, null, 2)], { 
-      type: 'application/json' 
+  const formatTimestamp = (timestamp) => {
+    const date = new Date(timestamp);
+    return date.toLocaleString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
     });
-    
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `copy-generation-history-${new Date().toISOString().split('T')[0]}.json`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
-  }, [history]);
-
-  /**
-   * Clear history
-   */
-  const clearHistory = useCallback(() => {
-    setHistory([]);
-  }, []);
-
-  /**
-   * Remove specific history entry
-   */
-  const removeHistoryEntry = useCallback((historyId) => {
-    setHistory(prev => prev.filter(entry => entry.id !== historyId));
-  }, []);
-
-  /**
-   * Copy text to clipboard
-   */
-  const copyToClipboard = useCallback(async (text, format = 'plain') => {
-    try {
-      if (format === 'html') {
-        // For HTML, create a rich text clipboard item
-        const clipboardItem = new ClipboardItem({
-          'text/html': new Blob([text], { type: 'text/html' }),
-          'text/plain': new Blob([text.replace(/<[^>]*>/g, '')], { type: 'text/plain' })
-        });
-        await navigator.clipboard.write([clipboardItem]);
-      } else {
-        await navigator.clipboard.writeText(text);
-      }
-      return { success: true };
-    } catch (err) {
-      console.error('Failed to copy to clipboard:', err);
-      return { success: false, error: err.message };
-    }
-  }, []);
-
-  /**
-   * Get template preview
-   */
-  const getTemplatePreview = useCallback((assetType) => {
-    try {
-      return templateService.previewTemplate(assetType);
-    } catch (err) {
-      console.error('Error getting template preview:', err);
-      return { error: err.message };
-    }
-  }, []);
-
-  /**
-   * Get available templates
-   */
-  const getAvailableTemplates = useCallback(() => {
-    try {
-      return templateService.getAvailableTemplates();
-    } catch (err) {
-      console.error('Error getting available templates:', err);
-      return [];
-    }
-  }, []);
-
-  /**
-   * Get compliance rules for country
-   */
-  const getComplianceRules = useCallback((countryCode) => {
-    try {
-      return templateService.getComplianceRules(countryCode);
-    } catch (err) {
-      console.error('Error getting compliance rules:', err);
-      return null;
-    }
-  }, []);
-
-  /**
-   * Download generated copy as file
-   */
-  const downloadCopy = useCallback((copy, filename) => {
-    if (!copy) {
-      setError('No copy available to download');
-      return false;
-    }
-
-    try {
-      const blob = new Blob([copy.plainText], { type: 'text/plain' });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = filename || `legal-copy-${Date.now()}.txt`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
-      return true;
-    } catch (err) {
-      setError(`Failed to download copy: ${err.message}`);
-      return false;
-    }
-  }, []);
-
-  return {
-    // State
-    isGenerating,
-    generatedCopy,
-    error,
-    history,
-
-    // Actions
-    generateCopy,
-    cancelGeneration,
-    clearResults,
-    regenerateCopy,
-
-    // History management
-    clearHistory,
-    removeHistoryEntry,
-    exportHistory,
-
-    // Utilities
-    copyToClipboard,
-    downloadCopy,
-    getStats,
-    getTemplatePreview,
-    getAvailableTemplates,
-    getComplianceRules
   };
+
+  return (
+    <div className="bg-white rounded-lg border-2 border-bf-blue overflow-hidden">
+      {/* Header */}
+      <div className="bg-bf-blue text-bf-gold p-4 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <Clock className="w-5 h-5" />
+          <h3 className="text-lg font-semibold">Copy History</h3>
+          <span className="bg-bf-gold text-bf-blue px-2 py-1 rounded-full text-xs font-bold">
+            {history.length}
+          </span>
+        </div>
+        {history.length > 0 && (
+          <button
+            onClick={onClear}
+            className="text-bf-gold hover:text-white transition-colors text-sm flex items-center gap-2"
+          >
+            <Trash2 className="w-4 h-4" />
+            Clear All
+          </button>
+        )}
+      </div>
+
+      {/* History List */}
+      <div className="divide-y divide-gray-200 max-h-96 overflow-y-auto">
+        {history.map((entry) => (
+          <div key={entry.id} className="p-4 hover:bg-gray-50 transition-colors">
+            {/* Entry Header */}
+            <div 
+              className="flex items-start justify-between cursor-pointer"
+              onClick={() => toggleEntry(entry.id)}
+            >
+              <div className="flex-1">
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="font-semibold text-gray-900">
+                    {entry.params.assetType}
+                  </span>
+                  <span className="text-gray-400">•</span>
+                  <span className="text-gray-600">
+                    {entry.params.countryCode}
+                  </span>
+                </div>
+                <div className="text-sm text-gray-500 flex items-center gap-2">
+                  <Clock className="w-3 h-3" />
+                  {formatTimestamp(entry.timestamp)}
+                </div>
+                {entry.params.brandIds && entry.params.brandIds.length > 0 && (
+                  <div className="text-xs text-gray-500 mt-1">
+                    {entry.params.brandIds.length} brand{entry.params.brandIds.length > 1 ? 's' : ''}
+                  </div>
+                )}
+              </div>
+
+              {/* Actions */}
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onCopyToClipboard(entry.result.plainText);
+                  }}
+                  className="p-2 text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                  title="Copy to clipboard"
+                >
+                  <Copy className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onDownload(entry.result, `copy-${entry.id}.txt`);
+                  }}
+                  className="p-2 text-green-600 hover:bg-green-50 rounded transition-colors"
+                  title="Download"
+                >
+                  <Download className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onRegenerate(entry.id);
+                  }}
+                  className="p-2 text-purple-600 hover:bg-purple-50 rounded transition-colors"
+                  title="Regenerate"
+                >
+                  <RefreshCw className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onRemove(entry.id);
+                  }}
+                  className="p-2 text-red-600 hover:bg-red-50 rounded transition-colors"
+                  title="Remove"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+
+            {/* Expanded Content */}
+            {expandedEntry === entry.id && (
+              <div className="mt-4 pt-4 border-t border-gray-200">
+                <div className="bg-gray-50 rounded-lg p-4">
+                  <h4 className="text-sm font-semibold text-gray-700 mb-2">Generated Copy:</h4>
+                  <div className="text-sm text-gray-800 whitespace-pre-wrap max-h-48 overflow-y-auto">
+                    {entry.result.plainText}
+                  </div>
+                </div>
+                
+                {entry.result.metadata && (
+                  <div className="mt-3 text-xs text-gray-500 space-y-1">
+                    {entry.result.metadata.brandCount && (
+                      <div>Brands: {entry.result.metadata.brandCount}</div>
+                    )}
+                    {entry.result.metadata.language && (
+                      <div>Language: {entry.result.metadata.language}</div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
 };
 
-// Additional hook for simplified copy generation
-export const useSimpleCopyGenerator = () => {
-  const {
-    isGenerating,
-    generatedCopy,
-    error,
-    generateCopy,
-    clearResults,
-    copyToClipboard,
-    downloadCopy
-  } = useTemplateEngine();
-
-  /**
-   * Simplified generate function with common defaults
-   */
-  const generate = useCallback(async (assetType, countryCode, brandIds) => {
-    const params = {
-      assetType,
-      countryCode,
-      brandIds: Array.isArray(brandIds) ? brandIds : [brandIds]
-    };
-
-    return await generateCopy(params);
-  }, [generateCopy]);
-
-  return {
-    isGenerating,
-    generatedCopy,
-    error,
-    generate,
-    clearResults,
-    copyToClipboard,
-    downloadCopy
-  };
+CopyHistory.propTypes = {
+  history: PropTypes.arrayOf(PropTypes.shape({
+    id: PropTypes.number.isRequired,
+    timestamp: PropTypes.string.isRequired,
+    params: PropTypes.object.isRequired,
+    result: PropTypes.object.isRequired
+  })),
+  onRegenerate: PropTypes.func.isRequired,
+  onRemove: PropTypes.func.isRequired,
+  onClear: PropTypes.func.isRequired,
+  onCopyToClipboard: PropTypes.func.isRequired,
+  onDownload: PropTypes.func.isRequired
 };
 
-// Hook for template management
-export const useTemplateManager = () => {
-  const [templates, setTemplates] = useState([]);
-  const [loading, setLoading] = useState(false);
-
-  const loadTemplates = useCallback(async () => {
-    setLoading(true);
-    try {
-      const availableTemplates = templateService.getAvailableTemplates();
-      setTemplates(availableTemplates);
-    } catch (err) {
-      console.error('Failed to load templates:', err);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  const getTemplate = useCallback((assetType) => {
-    return templates.find(t => t.assetType === assetType);
-  }, [templates]);
-
-  const validateTemplate = useCallback((assetType, content) => {
-    const template = getTemplate(assetType);
-    if (!template) return { valid: false, error: 'Template not found' };
-
-    if (content.length > template.maxLength) {
-      return { 
-        valid: false, 
-        error: `Content exceeds maximum length of ${template.maxLength} characters` 
-      };
-    }
-
-    return { valid: true };
-  }, [getTemplate]);
-
-  return {
-    templates,
-    loading,
-    loadTemplates,
-    getTemplate,
-    validateTemplate
-  };
-};
-
-export default useTemplateEngine;
+export default CopyHistory;

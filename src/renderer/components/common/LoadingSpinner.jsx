@@ -1,5 +1,5 @@
 // src/renderer/components/common/LoadingSpinner.jsx
-// Modern loading spinner component with different variants
+// Versatile loading spinner component with multiple variants and specialized loaders
 
 import React from 'react';
 import PropTypes from 'prop-types';
@@ -14,7 +14,6 @@ const LoadingSpinner = ({
   showIcon = true,
   color = 'blue'
 }) => {
-  // Size mappings
   const sizeClasses = {
     small: 'w-4 h-4',
     medium: 'w-6 h-6',
@@ -29,7 +28,6 @@ const LoadingSpinner = ({
     xlarge: 'text-xl'
   };
 
-  // Color mappings
   const colorClasses = {
     blue: 'text-blue-600 border-blue-600',
     gray: 'text-gray-600 border-gray-600',
@@ -39,7 +37,9 @@ const LoadingSpinner = ({
     white: 'text-white border-white'
   };
 
-  // Spinner variants
+  /**
+   * Render appropriate spinner icon based on variant
+   */
   const SpinnerIcon = ({ variant, size, color }) => {
     const iconClass = `${sizeClasses[size]} ${colorClasses[color]} animate-spin`;
     
@@ -104,7 +104,6 @@ const LoadingSpinner = ({
     </div>
   );
 
-  // Full page overlay
   if (fullPage) {
     return (
       <div className="fixed inset-0 bg-white bg-opacity-90 backdrop-blur-sm flex items-center justify-center z-50">
@@ -127,7 +126,9 @@ const LoadingSpinner = ({
   return <LoadingContent />;
 };
 
-// Specific loading components for different use cases
+/**
+ * Inline loader for small loading states within content
+ */
 export const InlineLoader = ({ message, size = 'small' }) => (
   <LoadingSpinner 
     size={size} 
@@ -138,6 +139,9 @@ export const InlineLoader = ({ message, size = 'small' }) => (
   />
 );
 
+/**
+ * Button loader for loading states within buttons
+ */
 export const ButtonLoader = ({ size = 'small' }) => (
   <LoadingSpinner 
     size={size} 
@@ -148,6 +152,9 @@ export const ButtonLoader = ({ size = 'small' }) => (
   />
 );
 
+/**
+ * Full page loader with overlay
+ */
 export const PageLoader = ({ message = 'Loading...' }) => (
   <LoadingSpinner 
     size="large" 
@@ -158,6 +165,9 @@ export const PageLoader = ({ message = 'Loading...' }) => (
   />
 );
 
+/**
+ * Card-style loader for content areas
+ */
 export const CardLoader = ({ message = 'Loading data...' }) => (
   <div className="bg-white border border-gray-200 rounded-lg p-8">
     <LoadingSpinner 
@@ -170,6 +180,9 @@ export const CardLoader = ({ message = 'Loading data...' }) => (
   </div>
 );
 
+/**
+ * Table skeleton loader with configurable rows and columns
+ */
 export const TableLoader = ({ rows = 3, cols = 4 }) => (
   <div className="space-y-3">
     {Array(rows).fill(0).map((_, rowIndex) => (
@@ -186,6 +199,9 @@ export const TableLoader = ({ rows = 3, cols = 4 }) => (
   </div>
 );
 
+/**
+ * Skeleton loader for text content placeholders
+ */
 export const SkeletonLoader = ({ className = '', lines = 3 }) => (
   <div className={`space-y-3 ${className}`}>
     {Array(lines).fill(0).map((_, index) => (
@@ -202,7 +218,9 @@ export const SkeletonLoader = ({ className = '', lines = 3 }) => (
   </div>
 );
 
-// Brand-specific loader for Brown-Forman
+/**
+ * Brand-specific loader for Brown-Forman branded loading states
+ */
 export const BrandLoader = ({ message = 'Loading Brown-Forman brands...' }) => (
   <div className="bg-gradient-to-r from-blue-800 to-blue-900 text-white p-6 rounded-lg">
     <div className="flex items-center gap-4">
@@ -240,14 +258,5 @@ LoadingSpinner.propTypes = {
   showIcon: PropTypes.bool,
   color: PropTypes.oneOf(['blue', 'gray', 'green', 'orange', 'red', 'white'])
 };
-
-// CSS animations (add to globals.css)
-const styles = `
-@keyframes loading-progress {
-  0% { transform: translateX(-100%); }
-  50% { transform: translateX(0%); }
-  100% { transform: translateX(100%); }
-}
-`;
 
 export default LoadingSpinner;

@@ -1,5 +1,5 @@
 // src/renderer/services/excelService.js
-// Excel Data Service - Handles loading and parsing Excel data
+// Excel Data Service - Handles loading and parsing Excel data for the Legal Copy Generator
 
 class ExcelService {
   constructor() {
@@ -9,11 +9,12 @@ class ExcelService {
   }
 
   /**
-   * Load Excel data from main process
+   * Load Excel data from main process via Electron IPC
+   * @returns {Promise<Object>} Result object with success status and data
    */
   async loadData() {
     try {
-      console.log('ExcelService: Starting Excel data load...');
+      console.log('ExcelService: Starting Excel data load');
       
       if (!window.electronAPI) {
         throw new Error('Electron API not available');
@@ -34,15 +35,15 @@ class ExcelService {
       };
       this.isLoaded = true;
 
-      console.log('ExcelService: Excel data loaded successfully!');
+      console.log('ExcelService: Excel data loaded successfully');
       console.log('Available sheets:', Object.keys(this.data));
-      console.log('FIRST BRAND ROW:', this.data['Trademark Config'][1]);
+      console.log('First brand row:', this.data['Trademark Config'][1]);
       console.log('Sheet summary:');
       Object.keys(this.data).forEach(sheetName => {
         const rowCount = this.data[sheetName].length;
-        console.log(`   - ${sheetName}: ${rowCount} rows`);
+        console.log(`  - ${sheetName}: ${rowCount} rows`);
         if (rowCount > 0) {
-          console.log(`     Sample columns:`, Object.keys(this.data[sheetName][0]));
+          console.log(`    Sample columns:`, Object.keys(this.data[sheetName][0]));
         }
       });
 
@@ -81,12 +82,8 @@ class ExcelService {
     return this.metadata;
   }
 
-  // ============================================
-  // BASE BRAND EXTRACTION LOGIC
-  // ============================================
-
   /**
-   * Extract base brand name from expression
+   * Extract base brand name from full expression name
    * Handles cases like "Benriach 10 Year Old" -> "Benriach"
    * @param {string} expressionName - Full expression name
    * @returns {string} Base brand name
@@ -128,13 +125,9 @@ class ExcelService {
     return expressionName;
   }
 
-  // ============================================
-  // DATA RETRIEVAL METHODS
-  // ============================================
-
   /**
-   * Get brands from Trademark Config
-   * Columns: 'Display Names', 'Brand Names', 'Entity Names', 'Trademark Type', 'TTB Type'
+   * Get all brands from Trademark Config sheet
+   * @returns {Array<Object>} Array of brand objects with trademark configuration
    */
   getBrands() {
     if (!this.data || !this.data['Trademark Config']) {
@@ -165,8 +158,8 @@ class ExcelService {
   }
 
   /**
-   * Get asset types from Overall Structure
-   * Columns: 'Asset Type', 'Structure'
+   * Get all asset types from Overall Structure sheet
+   * @returns {Array<Object>} Array of asset type objects
    */
   getAssetTypes() {
     if (!this.data || !this.data['Overall Structure']) {
@@ -187,8 +180,9 @@ class ExcelService {
   }
 
   /**
-   * Get countries from CountryLanguage sheet
-   * Columns: 'Abbv', 'Country', 'Language'
+   * Get all countries from CountryLanguage sheet
+   * Handles multi-language variants for same country
+   * @returns {Array<Object>} Array of country objects with language information
    */
   getCountries() {
     if (!this.data || !this.data['CountryLanguage']) {
@@ -229,10 +223,10 @@ class ExcelService {
   }
 
   /**
-   * Get TTB statement for a brand
+   * Get TTB statement for a specific brand
    * @param {string} brandName - Brand name to look up
    * @param {string} ttbType - Type: Full, Tightened, or Limited Character
-   * @returns {string} TTB statement or empty string
+   * @returns {string} TTB statement or empty string if not found
    */
   getTTBStatement(brandName, ttbType = 'Full') {
     if (!this.data || !this.data['TTB Statements']) {
@@ -266,10 +260,10 @@ class ExcelService {
 
   /**
    * Get brands available in a specific country
-   * Uses Brand Availability as source of truth with Entity Names and Third Party
+   * Uses Brand Availability as source of truth with Entity Names and Third Party information
    * Merges with Trademark Config for trademark configuration details
    * @param {string} countryCode - Country code (e.g., 'US', 'CA', 'GB')
-   * @returns {Array} Array of brand objects available in that country
+   * @returns {Array<Object>} Array of brand objects available in that country
    */
   getBrandsForCountry(countryCode) {
     console.log(`getBrandsForCountry called for: ${countryCode}`);
@@ -333,16 +327,16 @@ class ExcelService {
       }
     });
     
-    console.log(`Returning ${processedBrands.length} brands for ${countryCode}\n`);
+    console.log(`Returning ${processedBrands.length} brands for ${countryCode}`);
     
     return processedBrands;
   }
 
   /**
-   * Find matching brand using multiple strategies
-   * @param {string} searchName - Brand name from Brand Availability (or base brand)
-   * @param {Array} allBrands - All brands from Trademark Config
-   * @returns {Object|null} Matched brand object or null
+   * Find matching brand in Trademark Config using multiple matching strategies
+   * @param {string} searchName - Brand name from Brand Availability
+   * @param {Array<Object>} allBrands - All brands from Trademark Config
+   * @returns {Object|null} Matched brand object or null if no match found
    */
   findMatchingBrand(searchName, allBrands) {
     if (!searchName) return null;
@@ -357,30 +351,35 @@ class ExcelService {
 
     const normalizedSearch = normalize(searchName);
 
+    // Try exact match on display names
     let match = allBrands.find(b => b.displayNames === searchName);
     if (match) {
       console.log(`  Exact match (Display): "${searchName}" -> "${match.displayNames}"`);
       return match;
     }
 
+    // Try exact match on brand names
     match = allBrands.find(b => b.brandNames === searchName);
     if (match) {
       console.log(`  Exact match (Brand): "${searchName}" -> "${match.brandNames}"`);
       return match;
     }
 
+    // Try normalized match on display names
     match = allBrands.find(b => normalize(b.displayNames) === normalizedSearch);
     if (match) {
       console.log(`  Normalized match (Display): "${searchName}" -> "${match.displayNames}"`);
       return match;
     }
 
+    // Try normalized match on brand names
     match = allBrands.find(b => normalize(b.brandNames) === normalizedSearch);
     if (match) {
       console.log(`  Normalized match (Brand): "${searchName}" -> "${match.brandNames}"`);
       return match;
     }
 
+    // Try partial/contains match
     match = allBrands.find(b => {
       const displayNorm = normalize(b.displayNames);
       const brandNorm = normalize(b.brandNames);
@@ -405,7 +404,7 @@ class ExcelService {
 
   /**
    * Get TTB Type for a brand from Trademark Config
-   * @param {string} brandName - Brand name
+   * @param {string} brandName - Brand name to look up
    * @returns {string} TTB Type (Full/Tightened/Limited Character)
    */
   getTTBType(brandName) {
@@ -421,7 +420,9 @@ class ExcelService {
   }
 
   /**
-   * Get all languages for a country
+   * Get all languages available for a specific country
+   * @param {string} countryCode - Country code
+   * @returns {Array<Object>} Array of language objects for the country
    */
   getCountryLanguages(countryCode) {
     if (!this.data || !this.data['CountryLanguage']) return [];
@@ -435,7 +436,9 @@ class ExcelService {
   }
 
   /**
-   * Get trademark language data
+   * Get trademark language data for a specific language
+   * @param {string|null} language - Language to filter by (null returns all)
+   * @returns {Array<Object>} Trademark language data
    */
   getTrademarkLanguage(language = null) {
     if (!this.data || !this.data['Trademark Language']) return [];
@@ -450,7 +453,9 @@ class ExcelService {
   }
 
   /**
-   * Get trademark structure
+   * Get trademark structure data
+   * @param {string|null} type - Type to filter by (null returns all)
+   * @returns {Array<Object>} Trademark structure data
    */
   getTrademarkStructure(type = null) {
     if (!this.data || !this.data['Trademark Structure']) return [];
@@ -465,7 +470,9 @@ class ExcelService {
   }
 
   /**
-   * Get language dependent variables
+   * Get language dependent variables for a specific language
+   * @param {string} language - Language to look up
+   * @returns {Array<Object>} Language variables data
    */
   getLanguageVariables(language) {
     if (!this.data || !this.data['Language Dependent Variables']) return [];
@@ -476,7 +483,9 @@ class ExcelService {
   }
 
   /**
-   * Get overall structure
+   * Get overall structure template for asset type
+   * @param {string|null} assetType - Asset type to filter by (null returns all)
+   * @returns {Array<Object>} Overall structure data
    */
   getOverallStructure(assetType = null) {
     if (!this.data || !this.data['Overall Structure']) return [];
@@ -491,7 +500,8 @@ class ExcelService {
   }
 
   /**
-   * Get help text
+   * Get help text from Help Text sheet
+   * @returns {string} Help text instructions
    */
   getHelpText() {
     if (!this.data || !this.data['Help Text'] || this.data['Help Text'].length === 0) {
@@ -502,20 +512,31 @@ class ExcelService {
     return helpRow.Instructions || helpRow.HelpText || helpRow['Help Text'] || '';
   }
 
-  // ============================================
-  // UTILITY METHODS
-  // ============================================
-
+  /**
+   * Get brand by ID
+   * @param {string} id - Brand ID to look up
+   * @returns {Object|null} Brand object or null if not found
+   */
   getBrandById(id) {
     const brands = this.getBrands();
     return brands.find(brand => brand.id === id) || null;
   }
 
+  /**
+   * Get country by code
+   * @param {string} code - Country code to look up
+   * @returns {Object|null} Country object or null if not found
+   */
   getCountryByCode(code) {
     const countries = this.getCountries();
     return countries.find(country => country.code === code) || null;
   }
 
+  /**
+   * Get asset type by name or ID
+   * @param {string} nameOrId - Asset type name or ID
+   * @returns {Object|null} Asset type object or null if not found
+   */
   getAssetTypeByName(nameOrId) {
     const assetTypes = this.getAssetTypes();
     return assetTypes.find(
@@ -523,6 +544,11 @@ class ExcelService {
     ) || null;
   }
 
+  /**
+   * Search brands by query string
+   * @param {string} query - Search query
+   * @returns {Array<Object>} Filtered array of brand objects
+   */
   searchBrands(query) {
     const brands = this.getBrands();
     if (!query) return brands;
@@ -537,6 +563,11 @@ class ExcelService {
     );
   }
 
+  /**
+   * Search countries by query string
+   * @param {string} query - Search query
+   * @returns {Array<Object>} Filtered array of country objects
+   */
   searchCountries(query) {
     const countries = this.getCountries();
     if (!query) return countries;
@@ -548,6 +579,11 @@ class ExcelService {
     );
   }
 
+  /**
+   * Get template structure for a specific asset type
+   * @param {string} assetType - Asset type name
+   * @returns {Object|null} Template structure object or null
+   */
   getTemplateStructure(assetType) {
     const structure = this.getOverallStructure(assetType);
     if (structure.length === 0) return null;
@@ -555,7 +591,8 @@ class ExcelService {
   }
 
   /**
-   * Get statistics
+   * Get service statistics
+   * @returns {Object} Statistics object with counts and metadata
    */
   getStats() {
     const stats = {
@@ -571,7 +608,8 @@ class ExcelService {
   }
 
   /**
-   * Reload data
+   * Reload Excel data from scratch
+   * @returns {Promise<Object>} Result object with success status
    */
   async reload() {
     this.data = null;

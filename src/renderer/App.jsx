@@ -1,15 +1,13 @@
 // src/renderer/App.jsx
 // Main Application Component - Legal Copy Generator Interface
-// Handles UI, form state, and copy generation workflow
+// Handles UI state, form management, and copy generation workflow
 
 import React, { useState, useEffect } from 'react';
 import { useExcelData } from './index';
 import templateService from './services/templateService';
 import { ChevronDown, Search, Check, Copy, AlertCircle, Info, X, XCircle, Moon, Sun } from 'lucide-react';
 
-// ============================================
-// FEATURE: Console Log Buffer (for Ctrl+Shift+L copy)
-// ============================================
+// Console log buffer for debugging (Ctrl+Shift+L to copy)
 if (!window.__consoleBuffer) {
   window.__consoleBuffer = [];
   
@@ -66,13 +64,9 @@ if (!window.__consoleBuffer) {
 }
 
 const App = () => {
-  // ============================================
-  // STATE MANAGEMENT
-  // ============================================
-  
   const excelContext = useExcelData();
   
-  // DARK MODE STATE
+  // Dark mode state with persistence
   const [isDarkMode, setIsDarkMode] = useState(() => {
     const saved = localStorage.getItem('darkMode');
     return saved ? JSON.parse(saved) : false;
@@ -102,7 +96,7 @@ const App = () => {
   const countries = excelContext.getCountries() || [];
   const assetTypes = excelContext.getAssetTypes() || [];
 
-  // DARK MODE PERSISTENCE
+  // Persist dark mode preference
   useEffect(() => {
     localStorage.setItem('darkMode', JSON.stringify(isDarkMode));
     if (isDarkMode) {
@@ -112,9 +106,7 @@ const App = () => {
     }
   }, [isDarkMode]);
 
-  // ============================================
-  // FEATURE: Keyboard Shortcut for Console Log Copy (Ctrl+Shift+L)
-  // ============================================
+  // Keyboard shortcut for console log copy (Ctrl+Shift+L)
   useEffect(() => {
     const handleKeyPress = (e) => {
       if (e.ctrlKey && e.shiftKey && e.key === 'L') {
@@ -127,34 +119,28 @@ const App = () => {
     return () => window.removeEventListener('keydown', handleKeyPress);
   }, []);
 
-  // ============================================
-  // FEATURE: Copy Console Logs Function
-  // ============================================
+  /**
+   * Copy all console logs to clipboard for debugging
+   */
   const copyAllConsoleLogs = () => {
     try {
       const logs = window.__consoleBuffer || [];
       const logText = logs.join('\n');
       
       navigator.clipboard.writeText(logText).then(() => {
-        alert(`✅ Console logs copied to clipboard!\n\n${logs.length} log entries copied.\n\nPress Ctrl+V to paste.`);
+        alert(`Console logs copied to clipboard.\n\n${logs.length} log entries copied.\n\nPress Ctrl+V to paste.`);
       }).catch(err => {
         console.error('Failed to copy logs:', err);
-        alert('❌ Failed to copy logs to clipboard. Please check console for details.');
+        alert('Failed to copy logs to clipboard. Please check console for details.');
       });
     } catch (error) {
       console.error('Error copying console logs:', error);
-      alert('❌ Error copying logs. See console for details.');
+      alert('Error copying logs. See console for details.');
     }
   };
 
-  // ============================================
-  // HELPER FUNCTIONS FOR BRAND TYPES
-  // ============================================
-
   /**
    * Check if a brand is a multi-brand
-   * @param {string} brandName - Brand name to check
-   * @returns {boolean}
    */
   const isMultiBrand = (brandName) => {
     if (!brandName) return false;
@@ -163,9 +149,7 @@ const App = () => {
   };
 
   /**
-   * Check if a brand is FOB
-   * @param {string} brandName - Brand name to check
-   * @returns {boolean}
+   * Check if a brand is FOB (Family Of Brand)
    */
   const isFOBBrand = (brandName) => {
     if (!brandName) return false;
@@ -174,8 +158,7 @@ const App = () => {
   };
 
   /**
-   * Get selected brand names
-   * @returns {Array<string>}
+   * Get array of selected brand names
    */
   const getSelectedBrandNames = () => {
     return Array.from(selectedBrands)
@@ -185,7 +168,6 @@ const App = () => {
 
   /**
    * Check if any selected brands are multi-brand
-   * @returns {boolean}
    */
   const hasMultiBrandSelected = () => {
     const selectedNames = getSelectedBrandNames();
@@ -194,7 +176,6 @@ const App = () => {
 
   /**
    * Check if any selected brands are FOB
-   * @returns {boolean}
    */
   const hasFOBSelected = () => {
     const selectedNames = getSelectedBrandNames();
@@ -204,9 +185,7 @@ const App = () => {
   };
 
   /**
-   * Check if brand should be disabled
-   * @param {Object} brand - Brand object
-   * @returns {boolean}
+   * Determine if a brand should be disabled based on current selection
    */
   const isBrandDisabled = (brand) => {
     if (selectedBrands.has(brand.id)) {
@@ -247,8 +226,7 @@ const App = () => {
   };
 
   /**
-   * Get selected brand objects
-   * @returns {Array<Object>}
+   * Get array of selected brand objects
    */
   const getSelectedBrandObjects = () => {
     return Array.from(selectedBrands)
@@ -257,8 +235,7 @@ const App = () => {
   };
 
   /**
-   * Remove a brand from selection
-   * @param {string} brandId - Brand ID to remove
+   * Remove a brand from current selection
    */
   const handleRemoveSelectedBrand = (brandId) => {
     const newSelected = new Set(selectedBrands);
@@ -269,14 +246,8 @@ const App = () => {
     setShowErrorPopup(false);
   };
 
-  // ============================================
-  // EVENT HANDLERS
-  // ============================================
-
   /**
-   * Handle country selection and load available brands
-   * Filters brands by country and sorts alphabetically
-   * @param {string} countryCode - Selected country code
+   * Handle country selection and load available brands for that country
    */
   const handleCountryChange = (countryCode) => {
     setSelectedCountry(countryCode);
@@ -309,8 +280,7 @@ const App = () => {
   };
 
   /**
-   * Handle brand selection toggle with validation
-   * @param {string} brandId - Brand ID to toggle
+   * Handle brand selection toggle with multi-brand and FOB validation
    */
   const handleBrandToggle = (brandId) => {
     const brand = availableBrands.find(b => b.id === brandId);
@@ -338,7 +308,7 @@ const App = () => {
       return;
     }
 
-    // Trying to select a brand
+    // Validation for selecting a brand
     const hasOtherBrands = selectedBrands.size > 0;
     const hasMultiBrand = hasMultiBrandSelected();
     const hasFOB = hasFOBSelected();
@@ -351,7 +321,7 @@ const App = () => {
       brandIsFOB
     });
 
-    // Validation rules
+    // Apply validation rules
     if (brandIsMulti && hasOtherBrands) {
       setErrorPopupMessage('Cannot mix single brands with multi-brand selections. Please deselect other brands first.');
       setShowErrorPopup(true);
@@ -385,7 +355,7 @@ const App = () => {
   };
 
   /**
-   * Close error popup
+   * Close error popup dialog
    */
   const closeErrorPopup = () => {
     setShowErrorPopup(false);
@@ -393,7 +363,7 @@ const App = () => {
   };
 
   /**
-   * Handle select all / deselect all brands
+   * Toggle select all / deselect all brands
    */
   const handleSelectAll = () => {
     if (selectedBrands.size === filteredBrands.length) {
@@ -407,35 +377,25 @@ const App = () => {
     setAssetTypeInstructions(null);
   };
 
-  // ============================================
-  // FEATURE: Clear All Selection Handler
-  // ============================================
+  /**
+   * Clear all selections and generated copy
+   */
   const handleClearAll = () => {
     console.log('Clear All: Resetting all selections');
     
-    // Clear selected brands
     setSelectedBrands(new Set());
-    
-    // Clear generated copy
     setGeneratedCopy(null);
-    
-    // Clear search query
     setSearchQuery('');
-    
-    // Clear any errors
     setCopyError(null);
     setShowErrorPopup(false);
-    
-    // Clear instructions
     setAssetTypeInstructions(null);
     
     console.log('Clear All: Complete');
   };
 
   /**
-   * Handle copy generation
-   * Validates inputs, calls templateService, and displays results
-   * NEW FEATURE: Combines Asset Type Instructions with Country Specific instructions
+   * Generate legal copy with selected parameters
+   * Includes asset type instructions and country-specific notes
    */
   const handleGenerate = async () => {
     if (!selectedAssetType) {
@@ -456,7 +416,7 @@ const App = () => {
     setAssetTypeInstructions(null);
     
     try {
-      console.log('App: Starting copy generation...');
+      console.log('App: Starting copy generation');
       
       const selectedBrandNames = Array.from(selectedBrands)
         .map(id => {
@@ -473,15 +433,12 @@ const App = () => {
       console.log('Selected asset type NAME:', assetTypeName);
       console.log('Selected country:', selectedCountry);
       
-      // ============================================
-      // NEW FEATURE: Fetch Asset Type Instructions + Country Specific Instructions
-      // ============================================
+      // Fetch Asset Type Instructions and Country Specific Instructions
       const trademarkConfig = excelContext.rawData?.['Trademark Config'] || [];
       const assetTypeRow = trademarkConfig.find(row => 
         row['Asset Type'] === assetTypeName
       );
       
-      // Get Asset Type Instructions
       let combinedInstructions = '';
       
       if (assetTypeRow && assetTypeRow['Asset Type Instructions']) {
@@ -491,7 +448,7 @@ const App = () => {
         console.log('No Asset Type Instructions found for:', assetTypeName);
       }
       
-      // Add Country Specific instructions if available from CountryLanguage sheet Column D
+      // Add Country Specific instructions from CountryLanguage sheet Column D
       const countryLanguageSheet = excelContext.rawData?.['CountryLanguage'] || [];
       const countryData = countryLanguageSheet.find(row => 
         row['Abbv'] === selectedCountry || 
@@ -500,39 +457,32 @@ const App = () => {
       );
       
       if (countryData && countryData['Country Specific']) {
-        // Extract the actual string value from the cell (handles both strings and rich text objects)
+        // Extract string value from cell (handles rich text objects)
         let countrySpecificText = countryData['Country Specific'];
         
-        // If it's an object (rich text), extract the text property
         if (typeof countrySpecificText === 'object' && countrySpecificText !== null) {
           if (countrySpecificText.text) {
             countrySpecificText = countrySpecificText.text;
           } else if (countrySpecificText.richText) {
-            // Handle rich text array
             countrySpecificText = countrySpecificText.richText.map(rt => rt.text || '').join('');
           } else {
-            // Fallback: try to stringify
             countrySpecificText = String(countrySpecificText);
           }
         }
         
-        // Convert to string if it's not already
         countrySpecificText = String(countrySpecificText || '');
         
-        // Only use if it's not empty and not "None"
+        // Only use if not empty and not "None"
         if (countrySpecificText && countrySpecificText.trim() !== '' && countrySpecificText.trim() !== 'None') {
           if (combinedInstructions) {
-            // If we have asset type instructions, add country specific after it with spacing
             combinedInstructions += '<br><br>' + countrySpecificText;
           } else {
-            // If no asset type instructions, just use country specific
             combinedInstructions = countrySpecificText;
           }
           console.log('Added Country Specific instructions for:', selectedCountry);
         }
       }
       
-      // Set the combined instructions
       if (combinedInstructions) {
         setAssetTypeInstructions(combinedInstructions);
         console.log('Total instructions set (Asset Type + Country Specific)');
@@ -540,7 +490,6 @@ const App = () => {
         setAssetTypeInstructions(null);
         console.log('No instructions to display');
       }
-      // ============================================
       
       const result = await templateService.generateCopy({
         assetType: assetTypeName,
@@ -556,7 +505,7 @@ const App = () => {
           html: result.result.copy.html,
           metadata: result.result.metadata
         });
-        console.log('Copy generated successfully!');
+        console.log('Copy generated successfully');
         
         setTimeout(() => {
           document.getElementById('generated-copy-section')?.scrollIntoView({ 
@@ -580,7 +529,6 @@ const App = () => {
 
   /**
    * Copy generated text to clipboard
-   * @param {string} text - Text to copy
    */
   const handleCopyToClipboard = (text) => {
     navigator.clipboard.writeText(text);
@@ -588,15 +536,9 @@ const App = () => {
     setTimeout(() => setJustCopied(false), 2000);
   };
 
-  // ============================================
-  // HELPER FUNCTIONS
-  // ============================================
-
   /**
-   * Determine if entity should be shown for a brand
-   * Hides entity if it's redundant or causes confusion
-   * @param {Object} brand - Brand object
-   * @returns {boolean} Whether to show entity
+   * Determine if entity name should be displayed for a brand
+   * Hides redundant or confusing entity information
    */
   const shouldShowEntity = (brand) => {
     if (!brand.entity) return false;
@@ -625,10 +567,6 @@ const App = () => {
         (brand.entity && brand.entity.toLowerCase().includes(searchQuery.toLowerCase()))
       )
     : availableBrands;
-
-  // ============================================
-  // RENDER
-  // ============================================
 
   return (
     <div className={`min-h-screen relative overflow-hidden transition-colors duration-300 ${
@@ -706,7 +644,6 @@ const App = () => {
                   </span>
                 </div>
               </div>
-              {/* DARK MODE TOGGLE */}
               <button
                 onClick={() => setIsDarkMode(!isDarkMode)}
                 className={`p-3 rounded-lg transition-all duration-300 hover:scale-110 ${
@@ -908,7 +845,7 @@ const App = () => {
                     )}
                   </div>
                   
-                  {/* Selected Brands Chips - Inside Brand Selector Card */}
+                  {/* Selected Brands Display */}
                   {selectedBrands.size > 0 && (
                     <div className={`mt-4 pt-4 border-t-2 ${isDarkMode ? 'border-slate-600' : 'border-gray-200'}`}>
                       <div className="flex items-center justify-between mb-3">
@@ -1100,7 +1037,6 @@ const App = () => {
                     )}
                   </button>
 
-                  {/* FEATURE: Clear All Button - Added below Copy to Clipboard */}
                   <button
                     onClick={handleClearAll}
                     className={`w-full flex items-center justify-center gap-2 px-4 py-3 font-semibold rounded-lg transition-all border-2 transform hover:scale-[1.02] active:scale-[0.98] ${
@@ -1116,7 +1052,7 @@ const App = () => {
               ) : null}
             </div>
 
-            {/* NEW FEATURE: Asset Type Instructions + Country Specific Instructions Combined Card */}
+            {/* Asset Type Instructions Card */}
             {assetTypeInstructions && generatedCopy && (
               <div className={`mt-6 rounded-2xl shadow-lg p-6 border-2 hover-lift-subtle animate-fade-in relative overflow-hidden transition-colors duration-300 ${
                 isDarkMode 

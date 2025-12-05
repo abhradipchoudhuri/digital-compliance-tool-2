@@ -1,5 +1,5 @@
 // src/renderer/components/common/BrandInsights.jsx
-// Component for displaying brand analytics and insights
+// Component for displaying brand analytics and usage insights
 
 import React, { useState, useMemo } from 'react';
 import PropTypes from 'prop-types';
@@ -12,8 +12,7 @@ import {
   Star,
   Info,
   ChevronDown,
-  ChevronRight,
-  Filter
+  ChevronRight
 } from 'lucide-react';
 import excelService from '@services/excelService';
 
@@ -21,7 +20,9 @@ const BrandInsights = ({ history = [], selectedBrands = [], className = '' }) =>
   const [activeTab, setActiveTab] = useState('overview');
   const [expandedCategory, setExpandedCategory] = useState(null);
 
-  // Calculate insights from data
+  /**
+   * Calculate insights from historical data and current Excel data
+   */
   const insights = useMemo(() => {
     const brands = excelService.getBrands();
     const countries = excelService.getCountries();
@@ -33,7 +34,7 @@ const BrandInsights = ({ history = [], selectedBrands = [], className = '' }) =>
       return acc;
     }, {});
 
-    // Usage statistics from history
+    // Usage statistics from generation history
     const usageStats = history.reduce((acc, entry) => {
       entry.params.brandIds.forEach(brandId => {
         acc.brandUsage[brandId] = (acc.brandUsage[brandId] || 0) + 1;
@@ -64,6 +65,9 @@ const BrandInsights = ({ history = [], selectedBrands = [], className = '' }) =>
     };
   }, [history]);
 
+  /**
+   * Category breakdown component with expandable brand lists
+   */
   const CategoryBreakdown = ({ categoryStats, brands }) => {
     return (
       <div className="space-y-3">
@@ -86,7 +90,7 @@ const BrandInsights = ({ history = [], selectedBrands = [], className = '' }) =>
                     }}></div>
                     <div className="text-left">
                       <div className="font-medium text-gray-900">{category}</div>
-                      <div className="text-sm text-gray-500">{count} brands • {percentage}%</div>
+                      <div className="text-sm text-gray-500">{count} brands - {percentage}%</div>
                     </div>
                   </div>
                   {isExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
@@ -121,6 +125,9 @@ const BrandInsights = ({ history = [], selectedBrands = [], className = '' }) =>
     );
   };
 
+  /**
+   * Usage statistics component showing top brands, countries, and asset types
+   */
   const UsageStats = ({ usageStats, brands, countries, assetTypes }) => {
     const getTopItems = (stats, itemsArray, getDisplayName) => {
       return Object.entries(stats)
@@ -206,6 +213,9 @@ const BrandInsights = ({ history = [], selectedBrands = [], className = '' }) =>
     );
   };
 
+  /**
+   * Overview statistics component with key metrics
+   */
   const OverviewStats = ({ insights }) => {
     const stats = [
       { 
@@ -263,7 +273,6 @@ const BrandInsights = ({ history = [], selectedBrands = [], className = '' }) =>
 
   return (
     <div className={`bg-white rounded-lg border border-gray-200 ${className}`}>
-      {/* Header */}
       <div className="p-4 border-b border-gray-200">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -276,7 +285,6 @@ const BrandInsights = ({ history = [], selectedBrands = [], className = '' }) =>
           </div>
         </div>
 
-        {/* Tabs */}
         <div className="flex mt-4 border-b border-gray-200">
           {[
             { id: 'overview', label: 'Overview', icon: BarChart3 },
@@ -299,7 +307,6 @@ const BrandInsights = ({ history = [], selectedBrands = [], className = '' }) =>
         </div>
       </div>
 
-      {/* Content */}
       <div className="p-4">
         {activeTab === 'overview' && <OverviewStats insights={insights} />}
         
@@ -334,11 +341,10 @@ const BrandInsights = ({ history = [], selectedBrands = [], className = '' }) =>
         )}
       </div>
 
-      {/* Footer */}
       <div className="px-4 py-3 border-t border-gray-200 bg-gray-50 text-xs text-gray-500">
         <div className="flex items-center justify-between">
           <span>Data updated in real-time</span>
-          <span>Brown-Forman Digital Compliance</span>
+          <span>Brown-Forman Legal Copy Generator</span>
         </div>
       </div>
     </div>

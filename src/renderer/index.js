@@ -8,10 +8,6 @@ import './styles/globals.css';
 import App from './App';
 import excelService from './services/excelService';
 
-// ============================================
-// LOGGER INITIALIZATION
-// ============================================
-
 /**
  * Initialize logger with fallback to console
  */
@@ -31,10 +27,6 @@ try {
 }
 
 const logger = new Logger('App');
-
-// ============================================
-// EXCEL DATA CONTEXT
-// ============================================
 
 /**
  * React Context for Excel data
@@ -58,9 +50,6 @@ export const useExcelData = () => {
 /**
  * Excel Data Provider Component
  * Wraps the application and provides Excel data through context
- * @param {Object} props - Component props
- * @param {React.ReactNode} props.children - Child components
- * @param {Object} props.data - Excel data object
  */
 const ExcelDataProvider = ({ children, data }) => {
   const contextValue = {
@@ -68,7 +57,6 @@ const ExcelDataProvider = ({ children, data }) => {
     
     /**
      * Get all brands from Trademark Config
-     * @returns {Array<Object>} Array of brand objects
      */
     getBrands: () => {
       if (!data || !data['Trademark Config']) {
@@ -91,7 +79,6 @@ const ExcelDataProvider = ({ children, data }) => {
     
     /**
      * Get all countries from CountryLanguage
-     * @returns {Array<Object>} Array of country objects
      */
     getCountries: () => {
       if (!data || !data['CountryLanguage']) {
@@ -120,7 +107,6 @@ const ExcelDataProvider = ({ children, data }) => {
     
     /**
      * Get all asset types from Overall Structure
-     * @returns {Array<Object>} Array of asset type objects
      */
     getAssetTypes: () => {
       if (!data || !data['Overall Structure']) {
@@ -145,10 +131,6 @@ const ExcelDataProvider = ({ children, data }) => {
   );
 };
 
-// ============================================
-// APP WRAPPER COMPONENT
-// ============================================
-
 /**
  * App Wrapper Component
  * Handles Excel data loading and application initialization
@@ -166,11 +148,11 @@ class AppWrapper extends React.Component {
   }
 
   /**
-   * Component lifecycle: Initialize application on mount
+   * Initialize application on mount
    */
   async componentDidMount() {
     try {
-      logger.info('Initializing Digital Compliance Tool...');
+      logger.info('Initializing Legal Copy Generator');
       
       const isElectron = !!window.electronAPI;
       const mode = isElectron ? 'electron' : 'browser';
@@ -196,7 +178,7 @@ class AppWrapper extends React.Component {
    */
   async loadExcelData() {
     try {
-      logger.info('Attempting to load Excel data...');
+      logger.info('Attempting to load Excel data');
       
       const result = await this.excelService.loadData();
       
@@ -244,8 +226,7 @@ class AppWrapper extends React.Component {
   }
 
   /**
-   * Get mock data for demo/development mode
-   * @returns {Object} Mock Excel data structure
+   * Get mock data for demo and development mode
    */
   getMockData() {
     return {
@@ -291,9 +272,6 @@ class AppWrapper extends React.Component {
     };
   }
 
-  /**
-   * Render the application
-   */
   render() {
     const { isLoading, error, excelData, mode } = this.state;
 
@@ -303,7 +281,7 @@ class AppWrapper extends React.Component {
           <div className="text-center">
             <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-yellow-400 mx-auto mb-4"></div>
             <h2 className="text-2xl font-semibold text-yellow-400 mb-2">
-              Loading Digital Compliance Tool
+              Loading Legal Copy Generator
             </h2>
             <p className="text-yellow-300 opacity-80">
               Initializing Excel data...
@@ -329,10 +307,6 @@ class AppWrapper extends React.Component {
   }
 }
 
-// ============================================
-// ERROR BOUNDARY COMPONENT
-// ============================================
-
 /**
  * Error Boundary Component
  * Catches and displays React errors gracefully
@@ -343,27 +317,14 @@ class ErrorBoundary extends React.Component {
     this.state = { hasError: false, error: null };
   }
 
-  /**
-   * Update state when an error is caught
-   * @param {Error} error - The error that was thrown
-   * @returns {Object} New state
-   */
   static getDerivedStateFromError(error) {
     return { hasError: true, error: error.message };
   }
 
-  /**
-   * Log error details when caught
-   * @param {Error} error - The error that was thrown
-   * @param {Object} errorInfo - Additional error information
-   */
   componentDidCatch(error, errorInfo) {
     logger.error('Error caught:', error, errorInfo);
   }
 
-  /**
-   * Render error UI or children
-   */
   render() {
     if (this.state.hasError) {
       return (
@@ -392,13 +353,6 @@ class ErrorBoundary extends React.Component {
   }
 }
 
-// ============================================
-// APPLICATION INITIALIZATION
-// ============================================
-
-/**
- * Initialize and render the application
- */
 const root = ReactDOM.createRoot(document.getElementById('root'));
 
 root.render(
@@ -407,7 +361,6 @@ root.render(
   </ErrorBoundary>
 );
 
-logger.info('Digital Compliance Tool started');
+logger.info('Legal Copy Generator started');
 
-// Export context for external use
 export { ExcelDataContext };

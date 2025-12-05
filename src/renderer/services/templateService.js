@@ -1,5 +1,5 @@
 // src/renderer/services/templateService.js
-// Template Service - Manages copy templates and generation
+// Template Service - Manages copy templates and generation workflow
 
 import copyGenerator from './copyGenerator';
 import excelService from './excelService';
@@ -12,6 +12,8 @@ class TemplateService {
 
   /**
    * Initialize service with Excel data
+   * @param {Object} excelData - Parsed Excel data from all sheets
+   * @returns {Promise<Object>} Result object with success status
    */
   async initialize(excelData) {
     try {
@@ -19,13 +21,13 @@ class TemplateService {
         throw new Error('Excel data is required for initialization');
       }
 
-      console.log('TemplateService: Initializing with Excel data...');
+      console.log('TemplateService: Initializing with Excel data');
       console.log('TemplateService: Available sheets:', Object.keys(excelData));
       
       this.excelData = excelData;
       
-      // Initialize copy generator with Excel data AND excelService reference
-      console.log('TemplateService: Passing data to copyGenerator...');
+      // Initialize copy generator with Excel data and excelService reference
+      console.log('TemplateService: Passing data to copyGenerator');
       copyGenerator.initialize(excelData, excelService);
       
       this.isInitialized = true;
@@ -43,7 +45,9 @@ class TemplateService {
   }
 
   /**
-   * Generate compliance copy
+   * Generate compliance copy based on provided parameters
+   * @param {Object} params - Generation parameters (assetType, countryCode, brandIds)
+   * @returns {Promise<Object>} Result object with generated copy and metadata
    */
   async generateCopy(params) {
     try {
@@ -63,7 +67,7 @@ class TemplateService {
         throw new Error(result.error || 'Copy generation failed');
       }
 
-      console.log('✅ TemplateService: Copy generated successfully');
+      console.log('TemplateService: Copy generated successfully');
 
       return {
         success: true,
@@ -74,7 +78,7 @@ class TemplateService {
       };
 
     } catch (error) {
-      console.error('❌ TemplateService: Generation error:', error);
+      console.error('TemplateService: Generation error:', error);
       return {
         success: false,
         error: error.message
@@ -84,6 +88,9 @@ class TemplateService {
 
   /**
    * Validate generation parameters
+   * @param {Object} params - Parameters to validate
+   * @returns {boolean} True if valid
+   * @throws {Error} If validation fails
    */
   validateGenerationParams(params) {
     if (!params) {
@@ -108,7 +115,8 @@ class TemplateService {
   }
 
   /**
-   * Get available templates
+   * Get all available templates (asset types)
+   * @returns {Array<Object>} Array of template objects with asset type and display name
    */
   getAvailableTemplates() {
     if (!this.isInitialized) {
@@ -123,7 +131,10 @@ class TemplateService {
   }
 
   /**
-   * Get template for specific asset type
+   * Get template structure for a specific asset type
+   * @param {string} assetType - Asset type name
+   * @param {string} countryCode - Country code (default: 'US')
+   * @returns {Object|null} Template object or null if not found
    */
   getTemplate(assetType, countryCode = 'US') {
     if (!this.isInitialized) {
@@ -135,7 +146,8 @@ class TemplateService {
   }
 
   /**
-   * Get available countries
+   * Get all available countries
+   * @returns {Array<Object>} Array of country objects
    */
   getAvailableCountries() {
     if (!this.isInitialized) {
@@ -147,7 +159,8 @@ class TemplateService {
   }
 
   /**
-   * Get brands that have trademark data
+   * Get all available brands with trademark data
+   * @returns {Array<Object>} Array of brand objects
    */
   getAvailableBrands() {
     if (!this.isInitialized || !this.excelData) {
@@ -159,7 +172,9 @@ class TemplateService {
   }
 
   /**
-   * Get compliance rules for a country
+   * Get compliance rules for a specific country
+   * @param {string} countryCode - Country code to look up
+   * @returns {Object|null} Compliance rules object or null if not found
    */
   getComplianceRules(countryCode) {
     if (!this.isInitialized || !this.excelData) {
@@ -174,17 +189,20 @@ class TemplateService {
   }
 
   /**
-   * Format asset type name for display
+   * Format asset type name for cleaner display
+   * Removes category prefixes like "Digital |" or "Traditional |"
+   * @param {string} assetType - Full asset type name
+   * @returns {string} Formatted asset type name
    */
   formatAssetTypeName(assetType) {
-    // Remove "Digital | " or "Traditional | " prefix for cleaner display
     return assetType
       .replace(/^(Digital|Traditional)\s*\|\s*/i, '')
       .trim();
   }
 
   /**
-   * Check if service is ready
+   * Check if service is ready for copy generation
+   * @returns {boolean} True if service is initialized and ready
    */
   isReady() {
     const ready = this.isInitialized && copyGenerator.isReady();
@@ -193,7 +211,7 @@ class TemplateService {
   }
 
   /**
-   * Reset service
+   * Reset service to uninitialized state
    */
   reset() {
     this.isInitialized = false;
@@ -202,7 +220,8 @@ class TemplateService {
   }
 
   /**
-   * Get initialization status for debugging
+   * Get current initialization status for debugging
+   * @returns {Object} Status object with initialization details
    */
   getStatus() {
     return {
@@ -214,6 +233,5 @@ class TemplateService {
   }
 }
 
-// Export singleton instance
 const templateService = new TemplateService();
 export default templateService;
